@@ -1,5 +1,14 @@
 import { supabase } from "./supabaseClient.js";
 
+export const metadata = {
+  title: 'Live Coders',
+  description: 'Build. Get Stuck. Ask. Connect. Solve.',
+  icons: {
+    icon: 'assets/l-coders.png', // Place logo.png in your public/ folder
+  },
+};
+
+
 const state = {
   session: null,
   profile: null,
