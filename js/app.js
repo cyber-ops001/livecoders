@@ -332,15 +332,21 @@ function renderShell() {
   const search = document.querySelector("#globalSearch");
   const runGlobalSearch = () => {
     clearTimeout(state.searchTimer);
-    const q = search.value.trim();
-    if (q) trackInterest("search", q);
-    location.hash = q ? `explore?q=${encodeURIComponent(q)}` : "explore";
+    const q = search.value.trim().replace(/\s+/g, " ");
+    if (!q) {
+      location.hash = "explore";
+      return;
+    }
+    trackInterest("search", q);
+    const target = `explore?q=${encodeURIComponent(q)}`;
+    if (location.hash.slice(1) !== target) location.hash = target;
+    else navigate(target);
   };
   search.oninput = () => {
     clearTimeout(state.searchTimer);
     const q = search.value.trim();
     if (!q) return;
-    state.searchTimer = setTimeout(runGlobalSearch, 500);
+    state.searchTimer = setTimeout(runGlobalSearch, 350);
   };
   search.onkeydown = (e) => {
     if (e.key === "Enter") {
@@ -668,45 +674,18 @@ async function searchAll(q) {
   const key = term.toLowerCase();
   const cached = state.cache.search.get(key);
   if (cached && Date.now() - cached.at < 15000) return cached.data;
-  const like = `%${term.replaceAll("%", "\\%").replaceAll("_", "\\_")}%`;
-  const [users, posts, communities] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select(
-        "id,username,display_name,full_name,avatar_url,bio,skills,location",
-      )
-      .or(
-        `username.ilike.${like},display_name.ilike.${like},full_name.ilike.${like},bio.ilike.${like},location.ilike.${like}`,
-      )
-      .limit(20),
-    supabase
-      .from("posts")
-      .select(
-        "id,title,content,category,post_type,created_at,author_id,like_count,comment_count,view_count,author:profiles!posts_author_id_fkey(id,username,display_name,full_name,avatar_url)",
-      )
-      .or(`title.ilike.${like},content.ilike.${like},category.ilike.${like}`)
-      .order("created_at", { ascending: false })
-      .limit(20),
-    supabase
-      .from("communities")
-      .select(
-        "id,name,description,logo_url,category,member_count,view_count,recruitment_enabled,recruitment_mode,location,remote_mode,creator_id",
-      )
-      .or(
-        `name.ilike.${like},description.ilike.${like},category.ilike.${like},location.ilike.${like}`,
-      )
-      .order("member_count", { ascending: false })
-      .limit(20),
-  ]);
-  const error = users.error || posts.error || communities.error;
+  const { data, error } = await supabase.rpc("search_livecoders", {
+    search_query_input: term,
+  });
   if (error) throw error;
-  const data = {
-    users: users.data || [],
-    posts: posts.data || [],
-    communities: communities.data || [],
+  const result = data || {};
+  const normalized = {
+    users: Array.isArray(result.users) ? result.users : [],
+    posts: Array.isArray(result.posts) ? result.posts : [],
+    communities: Array.isArray(result.communities) ? result.communities : [],
   };
-  state.cache.search.set(key, { data, at: Date.now() });
-  return data;
+  state.cache.search.set(key, { data: normalized, at: Date.now() });
+  return normalized;
 }
 
 async function renderExplore(page, q = "") {
@@ -1196,7 +1175,7 @@ function communityMessageMarkup(m, communityId, channelId) {
     ? `<audio class="voicePlayer" controls src="${esc(m.voice_url)}"></audio>${m.voice_duration_seconds ? `<small class="voiceDuration">${m.voice_duration_seconds}s</small>` : ""}`
     : "";
   const body = deleted
-    ? `<span class="messageDeleted">Message unsent</span>`
+    ? `<span class="messageDeleted">Message deleted</span>`
     : `${m.content ? `<div>${esc(m.content)}</div>` : ""}${attachment}${voice}`;
   return `<div class="workspaceMessage ${own ? "mine" : ""}">
     ${image(m.sender?.avatar_url, m.sender?.display_name || m.sender?.username, "avatar tiny")}
@@ -1204,7 +1183,7 @@ function communityMessageMarkup(m, communityId, channelId) {
       <div class="workspaceMessageMeta">
         <b>${esc(m.sender?.display_name || m.sender?.username)}</b>
         <small>${timeAgo(m.created_at)}</small>
-        ${own && !deleted ? `<button class="messageMenuBtn" title="Unsend message" onclick="unsendCommunityMessage('${m.id}','${communityId}','${channelId || ""}')">⋯</button>` : ""}
+        ${own && !deleted ? `<button class="messageMenuBtn" title="Delete message" onclick="deleteCommunityMessage('${m.id}','${communityId}','${channelId || ""}')">Delete</button>` : ""}
       </div>
       <div class="workspaceBubble ${deleted ? "deleted" : ""}">${body}</div>
     </div>
@@ -1751,9 +1730,9 @@ function directMessageMarkup(messages, id) {
           ? `<audio class="voicePlayer" controls src="${esc(m.voice_url)}"></audio>`
           : "";
         const body = deleted
-          ? `<span class="messageDeleted">Message unsent</span>`
+          ? `<span class="messageDeleted">Message deleted</span>`
           : `${m.content ? `<div>${esc(m.content)}</div>` : ""}${attachment}${voice}`;
-        return `<div class="igMessage ${own ? "mine" : ""}"><div class="bubble ${deleted ? "deleted" : ""}">${body}${own && !deleted ? `<button class="messageMenuBtn" title="Unsend message" onclick="unsendDirectMessage('${m.id}','${id}')">Unsend</button>` : ""}<small>${timeAgo(m.created_at)}</small></div></div>`;
+        return `<div class="igMessage ${own ? "mine" : ""}"><div class="bubble ${deleted ? "deleted" : ""}">${body}${own && !deleted ? `<button class="messageMenuBtn" title="Delete message" onclick="deleteDirectMessage('${m.id}','${id}')">Delete</button>` : ""}<small>${timeAgo(m.created_at)}</small></div></div>`;
       })
       .join("") ||
     `<div class="chatEmpty"><div>💬</div><p>No messages yet.</p><small>Start the conversation.</small></div>`
@@ -2030,28 +2009,48 @@ window.toggleCommunityChannelLock = async function (
   await renderCommunityWorkspace(document.querySelector("#page"), communityId);
 };
 
-window.unsendCommunityMessage = async function (
+window.deleteCommunityMessage = async function (
   messageId,
   communityId,
   channelId,
 ) {
-  const { error } = await supabase.rpc("unsend_community_message", {
+  if (
+    !confirm(
+      "Delete this message? It will be removed for everyone in this channel.",
+    )
+  )
+    return;
+  const { error } = await supabase.rpc("delete_community_message", {
     message_id_input: messageId,
   });
   if (error) toast(error.message, "error");
-  else
+  else {
+    toast("Message deleted.", "success");
     await refreshCommunityChat(
       communityId,
       channelId || state.selectedCommunityChannel,
     );
+  }
 };
-window.unsendDirectMessage = async function (messageId, conversationId) {
-  const { error } = await supabase.rpc("unsend_direct_message", {
+window.deleteDirectMessage = async function (messageId, conversationId) {
+  if (
+    !confirm(
+      "Delete this message? It will be removed for everyone in this conversation.",
+    )
+  )
+    return;
+  const { error } = await supabase.rpc("delete_direct_message", {
     message_id_input: messageId,
   });
   if (error) toast(error.message, "error");
-  else await loadChat(conversationId);
+  else {
+    toast("Message deleted.", "success");
+    await loadChat(conversationId);
+  }
 };
+// Backwards-compatible aliases for any older UI hooks.
+window.unsendCommunityMessage = window.deleteCommunityMessage;
+window.unsendDirectMessage = window.deleteDirectMessage;
 window.openCommunityChatSettings = function (communityId, channelId) {
   modal(
     `<h2>Chat settings</h2><p class="muted">Delete this channel's chat history from your view.</p><button class="danger full" onclick="clearCommunityChatHistory('${communityId}','${channelId}')">Delete chat history</button>`,
