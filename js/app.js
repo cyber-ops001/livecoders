@@ -1,14 +1,5 @@
 import { supabase } from "./supabaseClient.js";
 
-export const metadata = {
-  title: 'Live Coders',
-  description: 'Build. Get Stuck. Ask. Connect. Solve.',
-  icons: {
-    icon: 'assets/l-coders.png', // Place logo.png in your public/ folder
-  },
-};
-
-
 const state = {
   session: null,
   profile: null,
@@ -74,155 +65,37 @@ function renderLanding() {
   document.documentElement.dataset.public="landing";
   app.innerHTML = `<main class="landingPage">
     <nav class="landingNav">
-      <button class="landingBrand" type="button" onclick="window.renderLanding()" aria-label="Live Coders home">
-        <img src="assets/live-coders-logo.svg" alt="Live Coders">
-        <span><strong>Live Coders</strong><small>Build • Ask • Connect</small></span>
-      </button>
-
-      <div class="landingNavLinks">
-        <a href="#landing-features" data-landing-scroll="landing-features">Features</a>
-        <a href="#landing-communities" data-landing-scroll="landing-communities">Communities</a>
-        <a href="#landing-how-it-works" data-landing-scroll="landing-how-it-works">How it works</a>
-      </div>
-
-      <div class="landingNavActions">
-        <button class="landingLogin" type="button" onclick="showAuth('login')">Log in</button>
-        <button class="primary landingSignup" type="button" onclick="showAuth('signup')">Create account</button>
-      </div>
+      <button class="landingBrand" onclick="renderLanding()"><img src="assets/live-coders-logo.svg" alt="Live Coders"><span><strong>Live Coders</strong><small>Build • Ask • Connect</small></span></button>
+      <div class="landingNavLinks"><a href="#features">Features</a><a href="#communities">Communities</a><a href="#builders">For builders</a></div>
+      <div class="landingNavActions"><button class="landingLogin" onclick="showAuth('login')">Log in</button><button class="primary landingSignup" onclick="showAuth('signup')">Create account</button></div>
     </nav>
-
     <section class="landingHero">
       <div class="landingHeroCopy">
         <div class="eyebrow">THE SOCIAL NETWORK FOR BUILDERS</div>
         <h1>Build in public.<br><span>Connect with people who build.</span></h1>
         <p>Live Coders is a developer-first network for sharing projects, solving problems, joining focused communities, publishing build stories and meeting the people behind the code.</p>
-
-        <div class="landingCtas">
-          <button class="primary landingCta" type="button" onclick="showAuth('signup')">Start building free →</button>
-          <button class="landingGhost" type="button" data-landing-scroll="landing-features">Explore the platform</button>
-        </div>
-
-        <div class="landingProof">
-          <span>✓ Developer communities</span>
-          <span>✓ Projects & blogs</span>
-          <span>✓ Build reels</span>
-          <span>✓ Direct messages</span>
-        </div>
+        <div class="landingCtas"><button class="primary landingCta" onclick="showAuth('signup')">Start building free →</button><button class="landingGhost" onclick="showAuth('login')">I already have an account</button></div>
+        <div class="landingProof"><span>✓ Developer communities</span><span>✓ Projects & blogs</span><span>✓ Build reels</span><span>✓ Direct messages</span></div>
       </div>
-
       <div class="landingVisual" aria-label="Live Coders product preview">
         <div class="landingWindow">
           <div class="windowTop"><span></span><span></span><span></span><b>Live Coders</b></div>
-          <div class="windowBody">
-            <aside>
-              <strong>Live Coders</strong>
-              <small>Build • Ask • Connect</small>
-              <i>⌂ Home</i><i>⌕ Explore</i><i>◈ Communities</i><i>✉ Messages</i>
-            </aside>
-            <div class="windowFeed">
-              <div class="miniSearch">⌕ Search developers, posts, communities…</div>
-              <div class="miniHero">
-                <span class="miniLogo">&lt;/&gt;</span>
-                <div><b>What are you building?</b><small>Discover developers and ideas matched to what you actually engage with.</small></div>
-              </div>
-              <div class="miniPost">
-                <div class="miniAvatar">BD</div>
-                <div>
-                  <b>Building a real-time developer community</b>
-                  <small>Web Development · Project Showcase</small>
-                  <p>Sharing progress, lessons and the next thing I’m shipping.</p>
-                  <div class="miniTags"><span>#webdev</span><span>#startup</span><span>#supabase</span></div>
-                </div>
-              </div>
-              <div class="miniRow"><span>◈</span><div><b>Popular communities</b><small>AI • Startups • Web • Mobile • Open Source</small></div></div>
-            </div>
-          </div>
+          <div class="windowBody"><aside><strong>Live Coders</strong><small>Build • Ask • Connect</small><i>⌂ Home</i><i>⌕ Explore</i><i>◈ Communities</i><i>✉ Messages</i></aside><div class="windowFeed"><div class="miniSearch">⌕ Search developers, posts, communities…</div><div class="miniHero"><span class="miniLogo">&lt;/&gt;</span><div><b>What are you building?</b><small>Discover developers and ideas matched to what you actually engage with.</small></div></div><div class="miniPost"><div class="miniAvatar">BD</div><div><b>Building a real-time developer community</b><small>Web Development · Project Showcase</small><p>Sharing progress, lessons and the next thing I’m shipping.</p><div class="miniTags"><span>#webdev</span><span>#startup</span><span>#supabase</span></div></div></div><div class="miniRow"><span>◈</span><div><b>Popular communities</b><small>AI • Startups • Web • Mobile • Open Source</small></div></div></div></div>
         </div>
       </div>
     </section>
-
-    <section class="landingStats">
-      <div><b>Build</b><span>Share what you're making</span></div>
-      <div><b>Connect</b><span>Meet developers with shared momentum</span></div>
-      <div><b>Grow</b><span>Learn through communities and conversations</span></div>
-    </section>
-
-    <section id="landing-features" class="landingSection">
-      <div class="landingSectionHead">
-        <div class="eyebrow">ONE PLACE TO BUILD</div>
-        <h2>Everything a developer community needs.</h2>
-        <p>Designed around builders instead of endless noise.</p>
-      </div>
-
-      <div class="landingFeatureGrid">
-        <article><span>01</span><h3>Smart developer feed</h3><p>Your feed learns from searches, communities, posts and creators you interact with. No interest questionnaire.</p></article>
-        <article><span>02</span><h3>Focused communities</h3><p>Join communities by type — Startups, AI/ML, Web Development, Cybersecurity, Open Source and more.</p></article>
-        <article><span>03</span><h3>Build stories</h3><p>Publish quick posts, long-form multi-page blogs or short build reels showing what you are shipping.</p></article>
-        <article><span>04</span><h3>Real conversations</h3><p>Use community channels and direct messages to ask questions, collaborate and share progress.</p></article>
-        <article><span>05</span><h3>Developer profiles</h3><p>Show projects, skills, experience and the work you are actually building.</p></article>
-        <article><span>06</span><h3>Made for every screen</h3><p>A responsive interface that adapts cleanly from phones to large desktop displays.</p></article>
-      </div>
-    </section>
-
-    <section id="landing-communities" class="landingDarkSection">
-      <div class="landingSectionHead">
-        <div class="eyebrow">FIND YOUR PEOPLE</div>
-        <h2>Communities with a purpose.</h2>
-        <p>Every community chooses its own category, rules and focus.</p>
-      </div>
-      <div class="landingCategoryGrid">${["Startups & Founders","AI & Machine Learning","Web Development","Mobile Development","Cybersecurity","Cloud & DevOps","Game Development","Open Source","UI/UX & Design","Blockchain & Web3","Programming Languages","Career & Jobs"].map(x=>`<span>${esc(x)}</span>`).join("")}</div>
-    </section>
-
-    <section id="landing-how-it-works" class="landingSection">
-      <div class="landingSectionHead">
-        <div class="eyebrow">HOW IT WORKS</div>
-        <h2>Build. Connect. Share. Grow.</h2>
-        <p>Start with your developer identity, discover the right people and turn conversations into progress.</p>
-      </div>
-      <div class="landingFeatureGrid">
-        <article><span>01</span><h3>Create your profile</h3><p>Build your developer identity around your skills, projects and experience.</p></article>
-        <article><span>02</span><h3>Discover communities</h3><p>Explore communities around technologies, startups and areas you care about.</p></article>
-        <article><span>03</span><h3>Share what you build</h3><p>Publish posts, multi-page blogs and build reels to show your progress.</p></article>
-        <article><span>04</span><h3>Connect and collaborate</h3><p>Follow developers, join conversations and message people who can help you move forward.</p></article>
-      </div>
-    </section>
-
-    <section class="landingSection landingBuilder">
-      <div>
-        <div class="eyebrow">FOR PEOPLE WHO SHIP</div>
-        <h2>Stop building alone.</h2>
-        <p>Find the right community, share the next version, ask for help and keep the momentum going.</p>
-      </div>
-      <button class="primary landingCta" type="button" onclick="showAuth('signup')">Join Live Coders →</button>
-    </section>
-
-    <footer class="landingFooter">
-      <span>© ${new Date().getFullYear()} Live Coders</span>
-      <span>Build. Ask. Connect. Solve.</span>
-    </footer>
+    <section class="landingStats"><div><b>Build</b><span>Share what you're making</span></div><div><b>Connect</b><span>Meet developers with shared momentum</span></div><div><b>Grow</b><span>Learn through communities and conversations</span></div></section>
+    <section id="features" class="landingSection"><div class="landingSectionHead"><div class="eyebrow">ONE PLACE TO BUILD</div><h2>Everything a developer community needs.</h2><p>Designed around builders instead of endless noise.</p></div><div class="landingFeatureGrid"><article><span>01</span><h3>Smart developer feed</h3><p>Your feed learns from searches, communities, posts and creators you interact with. No interest questionnaire.</p></article><article><span>02</span><h3>Focused communities</h3><p>Join communities by type — Startups, AI/ML, Web Development, Cybersecurity, Open Source and more.</p></article><article><span>03</span><h3>Build stories</h3><p>Publish quick posts, long-form multi-page blogs or short build reels showing what you are shipping.</p></article><article><span>04</span><h3>Real conversations</h3><p>Use community channels and direct messages to ask questions, collaborate and share progress.</p></article><article><span>05</span><h3>Developer profiles</h3><p>Show projects, skills, experience and the work you are actually building.</p></article><article><span>06</span><h3>Made for every screen</h3><p>A responsive interface that adapts cleanly from phones to large desktop displays.</p></article></div></section>
+    <section id="communities" class="landingDarkSection"><div class="landingSectionHead"><div class="eyebrow">FIND YOUR PEOPLE</div><h2>Communities with a purpose.</h2><p>Every community chooses its own category, rules and focus.</p></div><div class="landingCategoryGrid">${["Startups & Founders","AI & Machine Learning","Web Development","Mobile Development","Cybersecurity","Cloud & DevOps","Game Development","Open Source","UI/UX & Design","Blockchain & Web3","Programming Languages","Career & Jobs"].map(x=>`<span>${esc(x)}</span>`).join("")}</div></section>
+    <section id="builders" class="landingSection landingBuilder"><div><div class="eyebrow">FOR PEOPLE WHO SHIP</div><h2>Stop building alone.</h2><p>Find the right community, share the next version, ask for help and keep the momentum going.</p></div><button class="primary landingCta" onclick="showAuth('signup')">Join Live Coders →</button></section>
+    <footer class="landingFooter"><span>© ${new Date().getFullYear()} Live Coders</span><span>Build. Ask. Connect. Solve.</span></footer>
   </main>`;
-
-  // Landing anchors must never enter the authenticated app router.
-  app.querySelectorAll("[data-landing-scroll]").forEach(link => {
-    link.addEventListener("click", event => {
-      event.preventDefault();
-      const targetId = link.dataset.landingScroll;
-      const target = document.getElementById(targetId);
-      if (!target) return;
-      history.replaceState(null, "", `#${targetId}`);
-      target.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-  });
 }
-
-// Expose the landing-page renderer globally because the landing/auth markup
-// uses inline onclick handlers and app.js is loaded as an ES module.
-window.renderLanding = renderLanding;
 
 function renderAuth(mode="login") {
   document.documentElement.dataset.public="auth";
   state.publicAuthMode = mode === "signup" ? "signup" : "login";
-  app.innerHTML = `<main class="authPage"><button class="authBack" onclick="window.renderLanding()">← Back to Live Coders</button><section class="authHero"><img class="authLogo" src="assets/live-coders-logo.svg" alt="Live Coders logo"><div class="eyebrow">DEVELOPER NETWORK</div><h1>Live Coders</h1><p>Build. Get stuck. Ask. Connect. Solve.</p><div class="codeLine"><span>const</span> community = <b>"builders"</b>;</div><div class="authFeatureList"><span>✓ Developer communities</span><span>✓ Project & blog publishing</span><span>✓ Build reels and collaboration</span></div></section><section class="authCard"><div class="tabs"><button class="tab ${state.publicAuthMode==="login"?"active":""}" data-auth="login">Log in</button><button class="tab ${state.publicAuthMode==="signup"?"active":""}" data-auth="signup">Create account</button></div><div class="authDivider"><span>Use your email</span></div><form id="authForm"><div id="signupFields" class="${state.publicAuthMode==="signup"?"":"hidden"}"><label>Full name<input name="fullName" autocomplete="name"></label><label>Username<input name="username" autocomplete="username"></label></div><label>Email<input name="email" type="email" required autocomplete="email"></label><label>Password<input name="password" type="password" required minlength="6" autocomplete="current-password"></label><div id="confirmField" class="${state.publicAuthMode==="signup"?"":"hidden"}"><label>Confirm password<input name="confirmPassword" type="password" minlength="6" autocomplete="new-password"></label></div><button class="primary full" id="authSubmit">${state.publicAuthMode === "signup" ? "Create account" : "Log in"}</button><button class="linkButton ${state.publicAuthMode === "signup"?"hidden":""}" type="button" id="forgotBtn">Forgot password?</button></form></section></main>`;
+  app.innerHTML = `<main class="authPage"><button class="authBack" onclick="renderLanding()">← Back to Live Coders</button><section class="authHero"><img class="authLogo" src="assets/live-coders-logo.svg" alt="Live Coders logo"><div class="eyebrow">DEVELOPER NETWORK</div><h1>Live Coders</h1><p>Build. Get stuck. Ask. Connect. Solve.</p><div class="codeLine"><span>const</span> community = <b>"builders"</b>;</div><div class="authFeatureList"><span>✓ Developer communities</span><span>✓ Project & blog publishing</span><span>✓ Build reels and collaboration</span></div></section><section class="authCard"><div class="tabs"><button class="tab ${state.publicAuthMode==="login"?"active":""}" data-auth="login">Log in</button><button class="tab ${state.publicAuthMode==="signup"?"active":""}" data-auth="signup">Create account</button></div><div class="authDivider"><span>Use your email</span></div><form id="authForm"><div id="signupFields" class="${state.publicAuthMode==="signup"?"":"hidden"}"><label>Full name<input name="fullName" autocomplete="name"></label><label>Username<input name="username" autocomplete="username"></label></div><label>Email<input name="email" type="email" required autocomplete="email"></label><label>Password<input name="password" type="password" required minlength="6" autocomplete="current-password"></label><div id="confirmField" class="${state.publicAuthMode==="signup"?"":"hidden"}"><label>Confirm password<input name="confirmPassword" type="password" minlength="6" autocomplete="new-password"></label></div><button class="primary full" id="authSubmit">${state.publicAuthMode === "signup" ? "Create account" : "Log in"}</button><button class="linkButton ${state.publicAuthMode === "signup"?"hidden":""}" type="button" id="forgotBtn">Forgot password?</button></form></section></main>`;
   let modeNow=state.publicAuthMode;
   document.querySelectorAll("[data-auth]").forEach(btn => btn.onclick = () => { modeNow=btn.dataset.auth; state.publicAuthMode=modeNow; document.querySelectorAll("[data-auth]").forEach(x=>x.classList.toggle("active",x===btn)); document.querySelector("#signupFields").classList.toggle("hidden",modeNow!=="signup"); document.querySelector("#confirmField").classList.toggle("hidden",modeNow!=="signup"); document.querySelector("#authSubmit").textContent=modeNow==="signup"?"Create account":"Log in"; document.querySelector("#forgotBtn").classList.toggle("hidden",modeNow==="signup"); });
   document.querySelector("#authForm").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);try{if(modeNow==="signup"){if(f.get("password")!==f.get("confirmPassword"))throw new Error("Passwords do not match.");const fullName=String(f.get("fullName")||"").trim().replace(/\s+/g," ");const username=String(f.get("username")||"").trim().toLowerCase();if(!fullName||fullName.length<2)throw new Error("Enter your full name.");if(!/^[a-z0-9_]{3,30}$/.test(username))throw new Error("Username must be 3–30 characters.");const {data:takenUsername,error:usernameError}=await supabase.from("profiles").select("id").eq("username",username).maybeSingle();if(usernameError)throw usernameError;if(takenUsername)throw new Error("Username already taken.");const redirectTo=location.origin&&location.origin!=="null"?`${location.origin}/`:"http://localhost:5500/";const {data,error}=await supabase.auth.signUp({email:f.get("email"),password:f.get("password"),options:{data:{fullName,username},emailRedirectTo:redirectTo}});if(error)throw error;if(data.session){toast("Account created. Welcome to Live Coders!","success");return;}document.querySelector("#authSubmit").textContent="Account created";toast("Account created. Check your email to verify it, then return here to log in.","success");}else{const {error}=await supabase.auth.signInWithPassword({email:f.get("email"),password:f.get("password")});if(error)throw error;}}catch(err){toast(err.message,"error");}};
@@ -259,19 +132,7 @@ async function navigate(raw) {
     else await renderHome(page);
   } catch (e) { console.error(e); page.innerHTML = `<div class="errorState"><h2>Something went wrong</h2><p>${esc(e.message)}</p></div>`; }
 }
-window.addEventListener("hashchange", async () => {
-  const route = location.hash.slice(1).split("?")[0];
-  const landingSections = new Set(["landing-features","landing-communities","landing-how-it-works"]);
-  if (landingSections.has(route)) {
-    if (!state.session && !document.querySelector(".landingPage")) renderLanding();
-    const target = document.getElementById(route);
-    if (target) target.scrollIntoView({ behavior:"smooth", block:"start" });
-    return;
-  }
-  if (state.session) await navigate(location.hash.slice(1));
-  else if (route === "login" || route === "signup") renderAuth(route);
-  else renderLanding();
-});
+window.addEventListener("hashchange",()=>navigate(location.hash.slice(1)));
 
 function engagementScore(p){
   const ageHours=Math.max(0,(Date.now()-new Date(p.created_at||Date.now()).getTime())/3600000);
@@ -627,6 +488,7 @@ window.deleteCommunityChannel=async function(event,communityId,channelId){
     const {error}=await supabase.rpc("delete_community_channel",{community_id_input:communityId,channel_id_input:channelId});
     if(error) throw error;
     if(state.selectedCommunityChannel===channelId) state.selectedCommunityChannel=null;
+    if(wrap) wrap.remove();
     toast(`#${channelName} deleted.` ,"success");
     await renderCommunityWorkspace(document.querySelector("#page"),communityId);
   }catch(err){toast(err.message||"Could not delete channel.","error");if(button)button.disabled=false;}

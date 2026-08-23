@@ -514,7 +514,198 @@ img{max-width:100%}
 /* V14 multi-page blogs, image galleries and people mentions */
 .blogPageHeader{display:flex;align-items:center;justify-content:space-between;gap:12px}.blogPager{display:flex;gap:6px}.blogPager button{width:32px;height:32px;border-radius:9px;border:1px solid #24415f;background:#0d1b2c;color:#dce9f8;font-size:20px;line-height:1;cursor:pointer}.blogPager button:hover{border-color:#2b7fff;background:#122744}.postImageStrip{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:thin;padding:8px 2px 10px;margin-top:12px;overscroll-behavior-inline:contain}.postImageStrip img{width:min(82vw,420px);height:min(58vw,520px);min-width:min(82vw,420px);object-fit:cover;border-radius:12px;border:1px solid #20334a;background:#050b14;scroll-snap-align:start}.blogImageStrip{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:thin;padding:8px 2px 10px;margin-top:12px;overscroll-behavior-inline:contain}.blogImageStrip img{width:min(82vw,420px);height:min(58vw,520px);min-width:min(82vw,420px);object-fit:cover;border-radius:12px;border:1px solid #20334a;background:#050b14;scroll-snap-align:start}.composerBlogPage{padding:14px;border:1px solid #20334a;background:#081422;border-radius:12px;margin:10px 0}.composerBlogPage textarea{margin:10px 0}.pageImagePreview{display:flex;gap:8px;overflow-x:auto;margin-top:10px}.pageImagePreview img{width:86px;height:86px;object-fit:cover;border-radius:9px;border:1px solid #29445f}.mentionComposer{position:relative}.mentionResults{display:grid;gap:5px;margin-top:6px}.mentionResult{display:flex;align-items:center;gap:9px;width:100%;text-align:left;padding:8px;border:1px solid #20334a;background:#091625;color:#dce9f8;border-radius:9px;cursor:pointer}.mentionResult:hover{background:#10233a;border-color:#2b7fff}.mentionResult span{display:grid}.mentionResult small{color:#7e93aa}.selectedMentions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.mentionChip{display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border-radius:999px;background:#0e2c56;border:1px solid #2168c9;color:#b9d8ff;font-size:12px}.mentionChip button{border:0;background:transparent;color:inherit;cursor:pointer;padding:0;font-size:14px}@media(max-width:700px){.composerPageActions{align-items:flex-start;flex-direction:column}.composerRule{font-size:9px}.postHeader{gap:8px}.postHeaderActions{gap:5px}.postKind{padding:4px 6px}.postDeleteBtn{padding:4px 6px}.postImageStrip{margin-inline:-4px;padding-inline:4px}.postImageStrip img{width:82vw;min-width:82vw;height:112vw;max-height:520px}.blogImageStrip{margin-inline:-4px;padding-inline:4px}.blogImageStrip img{width:82vw;min-width:82vw;height:112vw;max-height:520px}.blogPager button{width:36px;height:36px}.postCard{overflow:visible}.modal{max-height:92vh;overflow:auto}}
 
-/* Latest landing page navigation */
-.landingNavLinks a{cursor:pointer}
-.landingSection,.landingDarkSection{scroll-margin-top:18px}
-.landingGhost{cursor:pointer}
+/* =========================================================
+   V15.1 — COMMUNITY WORKSPACE DARK FIX + RESPONSIVE POLISH
+   The workspace was still using the old light V6/V7 palette.
+   Keep the whole community experience consistent with the dark app.
+   ========================================================= */
+.communityWorkspace{
+  background:var(--bg);
+  color:var(--ink);
+  min-height:calc(100vh - 68px);
+}
+.communityWorkspace .workspaceHeader{
+  background:var(--bg);
+  border-bottom:1px solid var(--line);
+}
+.communityWorkspace .workspaceBack{
+  color:#8fa2ba;
+  margin:10px 22px;
+}
+.communityWorkspace .workspaceBack:hover{color:#fff}
+.communityWorkspace .workspaceHero{
+  min-height:150px;
+  padding:24px 30px;
+  background:linear-gradient(135deg,#0b1829 0%,#0d1d31 55%,#08111f 100%);
+  border-top:1px solid #13233a;
+  border-bottom:1px solid var(--line);
+  box-shadow:inset 0 -1px 0 rgba(255,255,255,.02);
+}
+.communityWorkspace .workspaceCommunityLogo{
+  width:88px;height:88px;
+  border:4px solid #13243b;
+  box-shadow:0 10px 28px rgba(0,0,0,.35);
+}
+.communityWorkspace .workspaceHeroText h1{color:#f5f8fc}
+.communityWorkspace .workspaceHeroText p{color:#a5b5c8}
+.communityWorkspace .workspaceHeroText small{color:#7f91a8}
+.communityWorkspace .workspaceHeroText .eyebrow{color:#5da5ff}
+.communityWorkspace .publicBadge{
+  background:rgba(49,209,124,.12);
+  border:1px solid rgba(49,209,124,.24);
+  color:#5ce39a;
+}
+.communityWorkspace .workspaceHeroActions{align-self:flex-start}
+.communityWorkspace .workspaceHeroActions .secondary{
+  background:#0e1b2d;border-color:#27405f;color:#e8f0fa;
+}
+.communityWorkspace .workspaceHeroActions .secondary:hover{background:#13263f;border-color:#37618e}
+.communityWorkspace .workspaceTabs{
+  background:#08111f;
+  border-top:0;
+  border-bottom:1px solid var(--line);
+  padding:0 28px;
+}
+.communityWorkspace .workspaceTab{color:#8194ab}
+.communityWorkspace .workspaceTab:hover{color:#dce8f6;background:#0d1b2d}
+.communityWorkspace .workspaceTab.active{color:#4e9aff;border-bottom-color:#1769ff}
+.communityWorkspace .workspaceBody{
+  background:#07101d;
+  border-top:0;
+  min-height:calc(100vh - 310px);
+}
+.communityWorkspace .workspaceLeft{
+  background:#08111f;
+  border-right:1px solid var(--line);
+  min-height:650px;
+}
+.communityWorkspace .workspaceSideTitle{color:#8194ab}
+.communityWorkspace .workspaceSideTitle button{color:#7fa9d8}
+.communityWorkspace .workspaceSideTitle button:hover{color:#fff}
+.communityWorkspace .channelItemWrap:hover{background:#0c1b2e}
+.communityWorkspace .channelItem{
+  color:#8094ad;
+  padding-right:38px;
+}
+.communityWorkspace .channelItem:hover{color:#dce8f5}
+.communityWorkspace .channelItem.active{color:#fff;background:#1769ff}
+.communityWorkspace .channelItem span:first-child{color:#7388a1}
+.communityWorkspace .channelItem.active span:first-child{color:#fff}
+.communityWorkspace .channelDeleteBtn{
+  opacity:.68;
+  background:#101d2e;
+  border:1px solid #263b55;
+  color:#9aacbf;
+  z-index:2;
+}
+.communityWorkspace .channelDeleteBtn:hover{
+  opacity:1;
+  background:#2a151b;
+  border-color:#71343f;
+  color:#ff7d88;
+}
+.communityWorkspace .channelItem.active+.channelDeleteBtn{
+  background:#0c1a2c;
+  border-color:#31557f;
+  color:#c4d5e8;
+}
+.communityWorkspace .channelItem.active+.channelDeleteBtn:hover{
+  background:#35171d;
+  border-color:#9a3f4c;
+  color:#ff8d97;
+}
+.communityWorkspace .dmRow:hover{background:#0c1b2e}
+.communityWorkspace .dmRow{color:#c4d1df}
+.communityWorkspace .dmRow small{color:#71859d}
+.communityWorkspace .workspaceUserCard{border-top-color:var(--line)}
+.communityWorkspace .workspaceUserCard small{color:#71859d}
+.communityWorkspace .workspaceUserCard button{
+  background:#0d1a2b;border-color:#243b57;color:#9db1c7;
+}
+.communityWorkspace .workspaceUserCard button:hover{background:#12243a;color:#fff;border-color:#355a84}
+.communityWorkspace .workspaceCenter{background:#07101d}
+.communityWorkspace .channelHeader{
+  background:#08111f;
+  border-bottom-color:var(--line);
+}
+.communityWorkspace .channelHeader h2{color:#eaf1f8}
+.communityWorkspace .channelHeader small{color:#72869e}
+.communityWorkspace .channelHeaderActions .iconBtn{color:#7f94ac}
+.communityWorkspace .channelHeaderActions .iconBtn:hover{color:#fff;background:#0e1d30}
+.communityWorkspace .workspaceChat{background:#07101d}
+.communityWorkspace .workspaceMessageMeta b{color:#dce7f2}
+.communityWorkspace .workspaceMessageMeta small{color:#71859d}
+.communityWorkspace .workspaceBubble{
+  background:#0e1b2c;
+  color:#d2dce8;
+  border:1px solid #1b2c42;
+}
+.communityWorkspace .workspaceMessage.mine .workspaceBubble{
+  background:#102a52;
+  border-color:#1d4e91;
+  color:#eaf3ff;
+}
+.communityWorkspace .chatEmpty{color:#73869d}
+.communityWorkspace .chatEmpty p{color:#9fb0c3}
+.communityWorkspace .workspaceComposer{
+  background:#08111f;
+  border-top-color:var(--line);
+}
+.communityWorkspace .workspaceComposer input{
+  background:#0c1828;
+  border-color:#243950;
+  color:#edf4fb;
+}
+.communityWorkspace .workspaceComposer input::placeholder{color:#687c95}
+.communityWorkspace .composerIcon{
+  background:#0d1a2b;
+  border-color:#243950;
+  color:#9db1c8;
+}
+.communityWorkspace .composerIcon:hover{background:#13253c;color:#fff}
+.communityWorkspace .sendButton{background:#1769ff;border-color:#1769ff}
+.communityWorkspace .joinChatNotice{
+  background:#08111f;
+  border-top-color:var(--line);
+  color:#71859d;
+}
+.communityWorkspace .workspaceRight{
+  background:#08111f;
+  border-left-color:var(--line);
+}
+.communityWorkspace .rightCard{
+  background:#0b1523;
+  border-color:#1c3046;
+  box-shadow:0 10px 30px rgba(0,0,0,.16);
+}
+.communityWorkspace .rightCard h3{color:#e8f0f8}
+.communityWorkspace .rosterRow{color:#dbe5ef}
+.communityWorkspace .rosterRow:hover{background:#102035}
+.communityWorkspace .rosterRow small{color:#70849d}
+.communityWorkspace .settingLine{color:#8498ae}
+.communityWorkspace .settingLine span{color:#4d9aff}
+.communityWorkspace .resourceRow{border-top-color:#172a3f;color:#dce6f0}
+.communityWorkspace .resourceRow small{color:#71849b}
+.communityWorkspace .resourceIcon{background:#10243d;color:#62a7ff}
+.communityWorkspace .sideMuted{color:#71849b}
+
+/* Prevent the community header from being clipped on narrow screens. */
+@media(max-width:900px){
+  .communityWorkspace .workspaceHero{padding:22px 20px}
+  .communityWorkspace .workspaceHeroActions{margin-left:auto}
+}
+@media(max-width:700px){
+  .communityWorkspace .workspaceBack{margin:9px 14px}
+  .communityWorkspace .workspaceHero{min-height:0;padding:18px 15px;gap:13px;flex-wrap:wrap}
+  .communityWorkspace .workspaceCommunityLogo{width:68px;height:68px;border-width:3px}
+  .communityWorkspace .workspaceHeroText{flex:1;min-width:180px}
+  .communityWorkspace .workspaceHeroText h1{font-size:21px;line-height:1.15}
+  .communityWorkspace .workspaceHeroText p{font-size:12px;line-height:1.45}
+  .communityWorkspace .workspaceHeroText small{font-size:9px;line-height:1.5}
+  .communityWorkspace .workspaceHeroActions{width:100%;margin-left:0}
+  .communityWorkspace .workspaceHeroActions button{flex:1}
+  .communityWorkspace .workspaceTabs{padding:0 10px}
+  .communityWorkspace .workspaceBody{min-height:0}
+  .communityWorkspace .workspaceChat{min-height:calc(100vh - 330px);padding:16px 14px}
+  .communityWorkspace .workspaceComposer{padding:10px}
+}
