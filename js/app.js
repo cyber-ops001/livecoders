@@ -179,37 +179,37 @@ function renderLanding() {
   document.documentElement.dataset.public = "landing";
   app.innerHTML = `<main class="landingPage">
     <nav class="landingNav">
-      <button class="landingBrand" onclick="renderLanding()"><img src="assets/live-coders-logo.svg" alt="Live Coders"><span><strong>Live Coders</strong><small>Build • Ask • Connect</small></span></button>
+      <button class="landingBrand" onclick="renderLanding()"><img src="assets/live-coders-logo.svg" alt="Live Coders"><span><strong>Live Coders</strong><small>Build • Connect • Grow</small></span></button>
       <div class="landingNavLinks"><a href="#features">Features</a><a href="#communities">Communities</a><a href="#builders">For builders</a></div>
       <div class="landingNavActions"><button class="landingLogin" onclick="showAuth('login')">Log in</button><button class="primary landingSignup" onclick="showAuth('signup')">Create account</button></div>
     </nav>
     <section class="landingHero">
       <div class="landingHeroCopy">
-        <div class="eyebrow">THE SOCIAL NETWORK FOR BUILDERS</div>
+        <div class="eyebrow">THE NETWORK FOR PEOPLE WHO BUILD</div>
         <h1>Build in public.<br><span>Connect with people who build.</span></h1>
-        <p>Live Coders is a developer-first network for sharing projects, solving problems, joining focused communities, publishing build stories and meeting the people behind the code.</p>
+        <p>Live Coders is a community network where developers, founders and traders share ideas, build products, find collaborators, learn from each other and grow together.</p>
         <div class="landingCtas"><button class="primary landingCta" onclick="showAuth('signup')">Start building free →</button><button class="landingGhost" onclick="showAuth('login')">I already have an account</button></div>
-        <div class="landingProof"><span>✓ Developer communities</span><span>✓ Projects & blogs</span><span>✓ Build reels</span><span>✓ Direct messages</span></div>
+        <div class="landingProof"><span>✓ Builder communities</span><span>✓ Projects & blogs</span><span>✓ Build reels</span><span>✓ Direct messages</span></div>
       </div>
       <div class="landingVisual" aria-label="Live Coders product preview">
         <div class="landingWindow">
           <div class="windowTop"><span></span><span></span><span></span><b>Live Coders</b></div>
-          <div class="windowBody"><aside><strong>Live Coders</strong><small>Build • Ask • Connect</small><i>⌂ Home</i><i>⌕ Explore</i><i>◈ Communities</i><i>✉ Messages</i></aside><div class="windowFeed"><div class="miniSearch">⌕ Search developers, posts, communities…</div><div class="miniHero"><span class="miniLogo">&lt;/&gt;</span><div><b>What are you building?</b><small>Discover developers and ideas matched to what you actually engage with.</small></div></div><div class="miniPost"><div class="miniAvatar">BD</div><div><b>Building a real-time developer community</b><small>Web Development · Project Showcase</small><p>Sharing progress, lessons and the next thing I’m shipping.</p><div class="miniTags"><span>#webdev</span><span>#startup</span><span>#supabase</span></div></div></div><div class="miniRow"><span>◈</span><div><b>Popular communities</b><small>AI • Startups • Web • Mobile • Open Source</small></div></div></div></div>
+          <div class="windowBody"><aside><strong>Live Coders</strong><small>Build • Connect • Grow</small><i>⌂ Home</i><i>⌕ Explore</i><i>◈ Communities</i><i>✉ Messages</i></aside><div class="windowFeed"><div class="miniSearch">⌕ Search developers, posts, communities…</div><div class="miniHero"><span class="miniLogo">&lt;/&gt;</span><div><b>What are you building?</b><small>Discover developers and ideas matched to what you actually engage with.</small></div></div><div class="miniPost"><div class="miniAvatar">BD</div><div><b>Building a real-time developer community</b><small>Web Development · Project Showcase</small><p>Sharing progress, lessons and the next thing I’m shipping.</p><div class="miniTags"><span>#webdev</span><span>#startup</span><span>#supabase</span></div></div></div><div class="miniRow"><span>◈</span><div><b>Popular communities</b><small>AI • Startups • Web • Mobile • Open Source</small></div></div></div></div>
         </div>
       </div>
     </section>
-    <section class="landingStats"><div><b>Build</b><span>Share what you're making</span></div><div><b>Connect</b><span>Meet developers with shared momentum</span></div><div><b>Grow</b><span>Learn through communities and conversations</span></div></section>
-    <section id="features" class="landingSection"><div class="landingSectionHead"><div class="eyebrow">ONE PLACE TO BUILD</div><h2>Everything a developer community needs.</h2><p>Designed around builders instead of endless noise.</p></div><div class="landingFeatureGrid"><article><span>01</span><h3>Smart developer feed</h3><p>Your feed learns from searches, communities, posts and creators you interact with. No interest questionnaire.</p></article><article><span>02</span><h3>Focused communities</h3><p>Join communities by type — Startups, AI/ML, Web Development, Cybersecurity, Open Source and more.</p></article><article><span>03</span><h3>Build stories</h3><p>Publish quick posts, long-form multi-page blogs or short build reels showing what you are shipping.</p></article><article><span>04</span><h3>Real conversations</h3><p>Use community channels and direct messages to ask questions, collaborate and share progress.</p></article><article><span>05</span><h3>Developer profiles</h3><p>Show projects, skills, experience and the work you are actually building.</p></article><article><span>06</span><h3>Made for every screen</h3><p>A responsive interface that adapts cleanly from phones to large desktop displays.</p></article></div></section>
+    <section class="landingStats"><div><b>Build</b><span>Share what you're making</span></div><div><b>Connect</b><span>Meet people with shared momentum</span></div><div><b>Grow</b><span>Learn through communities and conversations</span></div></section>
+    <section id="features" class="landingSection"><div class="landingSectionHead"><div class="eyebrow">ONE PLACE TO BUILD</div><h2>Everything builders need to move forward.</h2><p>Designed for developers, founders and traders who want useful conversations instead of endless noise.</p></div><div class="landingFeatureGrid"><article><span>01</span><h3>Smart developer feed</h3><p>Your feed learns from searches, communities, posts and creators you interact with. No interest questionnaire.</p></article><article><span>02</span><h3>Purpose-driven communities</h3><p>Join communities by type — Startups, AI/ML, Web, Cybersecurity, Open Source, Trading & Finance and more.</p></article><article><span>03</span><h3>Build stories</h3><p>Publish quick posts, long-form multi-page blogs or short build reels showing what you are shipping.</p></article><article><span>04</span><h3>Real conversations</h3><p>Use community channels and direct messages to ask questions, collaborate and share progress.</p></article><article><span>05</span><h3>Builder profiles</h3><p>Show your projects, skills, experience, ideas and the work you are actually growing.</p></article><article><span>06</span><h3>Made for every screen</h3><p>A responsive interface that adapts cleanly from phones to large desktop displays.</p></article></div></section>
     <section id="communities" class="landingDarkSection"><div class="landingSectionHead"><div class="eyebrow">FIND YOUR PEOPLE</div><h2>Communities with a purpose.</h2><p>Every community chooses its own category, rules and focus.</p></div><div class="landingCategoryGrid">${["Startups & Founders", "AI & Machine Learning", "Web Development", "Mobile Development", "Cybersecurity", "Cloud & DevOps", "Game Development", "Open Source", "UI/UX & Design", "Blockchain & Web3", "Programming Languages", "Career & Jobs", "Trading & Finance"].map((x) => `<span>${esc(x)}</span>`).join("")}</div></section>
     <section id="builders" class="landingSection landingBuilder"><div><div class="eyebrow">FOR PEOPLE WHO SHIP</div><h2>Stop building alone.</h2><p>Find the right community, share the next version, ask for help and keep the momentum going.</p></div><button class="primary landingCta" onclick="showAuth('signup')">Join Live Coders →</button></section>
-    <footer class="landingFooter"><span>© ${new Date().getFullYear()} Live Coders</span><span>Build. Ask. Connect. Solve.</span></footer>
+    <footer class="landingFooter"><span>© ${new Date().getFullYear()} Live Coders</span><span>Build. Connect. Grow.</span></footer>
   </main>`;
 }
 
 function renderAuth(mode = "login") {
   document.documentElement.dataset.public = "auth";
   state.publicAuthMode = mode === "signup" ? "signup" : "login";
-  app.innerHTML = `<main class="authPage"><button class="authBack" onclick="renderLanding()">← Back to Live Coders</button><section class="authHero"><img class="authLogo" src="assets/live-coders-logo.svg" alt="Live Coders logo"><div class="eyebrow">DEVELOPER NETWORK</div><h1>Live Coders</h1><p>Build. Get stuck. Ask. Connect. Solve.</p><div class="codeLine"><span>const</span> community = <b>"builders"</b>;</div><div class="authFeatureList"><span>✓ Developer communities</span><span>✓ Project & blog publishing</span><span>✓ Build reels and collaboration</span></div></section><section class="authCard"><div class="tabs"><button class="tab ${state.publicAuthMode === "login" ? "active" : ""}" data-auth="login">Log in</button><button class="tab ${state.publicAuthMode === "signup" ? "active" : ""}" data-auth="signup">Create account</button></div><div class="authDivider"><span>Use your email</span></div><form id="authForm"><div id="signupFields" class="${state.publicAuthMode === "signup" ? "" : "hidden"}"><label>Full name<input name="fullName" autocomplete="name"></label><label>Username<input name="username" autocomplete="username"></label></div><label>Email<input name="email" type="email" required autocomplete="email"></label><label>Password<input name="password" type="password" required minlength="6" autocomplete="current-password"></label><div id="confirmField" class="${state.publicAuthMode === "signup" ? "" : "hidden"}"><label>Confirm password<input name="confirmPassword" type="password" minlength="6" autocomplete="new-password"></label></div><button class="primary full" id="authSubmit">${state.publicAuthMode === "signup" ? "Create account" : "Log in"}</button><button class="linkButton ${state.publicAuthMode === "signup" ? "hidden" : ""}" type="button" id="forgotBtn">Forgot password?</button></form></section></main>`;
+  app.innerHTML = `<main class="authPage"><button class="authBack" onclick="renderLanding()">← Back to Live Coders</button><section class="authHero"><img class="authLogo" src="assets/live-coders-logo.svg" alt="Live Coders logo"><div class="eyebrow">DEVELOPER NETWORK</div><h1>Live Coders</h1><p>Build. Get stuck. Ask. Connect. Solve.</p><div class="codeLine"><span>const</span> community = <b>"builders"</b>;</div><div class="authFeatureList"><span>✓ Builder communities</span><span>✓ Project & blog publishing</span><span>✓ Build reels and collaboration</span></div></section><section class="authCard"><div class="tabs"><button class="tab ${state.publicAuthMode === "login" ? "active" : ""}" data-auth="login">Log in</button><button class="tab ${state.publicAuthMode === "signup" ? "active" : ""}" data-auth="signup">Create account</button></div><div class="authDivider"><span>Use your email</span></div><form id="authForm"><div id="signupFields" class="${state.publicAuthMode === "signup" ? "" : "hidden"}"><label>Full name<input name="fullName" autocomplete="name"></label><label>Username<input name="username" autocomplete="username"></label></div><label>Email<input name="email" type="email" required autocomplete="email"></label><label>Password<input name="password" type="password" required minlength="6" autocomplete="current-password"></label><div id="confirmField" class="${state.publicAuthMode === "signup" ? "" : "hidden"}"><label>Confirm password<input name="confirmPassword" type="password" minlength="6" autocomplete="new-password"></label></div><button class="primary full" id="authSubmit">${state.publicAuthMode === "signup" ? "Create account" : "Log in"}</button><button class="linkButton ${state.publicAuthMode === "signup" ? "hidden" : ""}" type="button" id="forgotBtn">Forgot password?</button></form></section></main>`;
   let modeNow = state.publicAuthMode;
   document.querySelectorAll("[data-auth]").forEach(
     (btn) =>
@@ -314,7 +314,7 @@ function renderShell() {
     state.profile?.full_name ||
     state.profile?.username ||
     "Developer";
-  app.innerHTML = `<div class="layout"><aside class="sidebar"><div class="brand" onclick="location.hash='home'"><img class="brandLogo" src="assets/live-coders-logo.svg" alt=""><div class="brandText"><strong>Live Coders</strong><small>Build • Ask • Connect</small></div></div><nav>${navItem("home", "⌂", "Home")}${navItem("explore", "⌕", "Explore")}${navItem("communities", "◈", "Communities")}${navItem("myCommunities", "▣", "My Communities")}${navItem("messages", "✉", "Messages")}${navItem("notifications", "●", "Notifications", unreadNotificationCount())}${navItem("profile", "◎", "Profile")}${navItem("settings", "⚙", "Settings")}</nav><div class="sidebarBottom"><button class="ghost full" id="logoutBtn">Log out</button></div></aside><div class="mainArea"><header class="topbar"><div class="mobileBrand"><img class="brandLogo small" src="assets/live-coders-logo.svg" alt=""><strong>Live Coders</strong></div><div class="globalSearch"><span>⌕</span><input id="globalSearch" value="${esc(new URLSearchParams(location.hash.split("?")[1] || "").get("q") || "")}" placeholder="Search developers, posts, communities…"></div><div class="topActions"><button class="notificationBtn" onclick="location.hash='notifications'" aria-label="Notifications" title="Notifications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M10 21h4"></path></svg><b id="notifBadge" class="notificationBadge ${unreadNotificationCount() ? "" : "hidden"}">${unreadNotificationCount()}</b></button><button class="primary" onclick="openPostModal()">+ Create Post</button><button class="topProfile" id="topProfileBtn" aria-label="Open profile">${image(avatar, display, "avatar small")}<span><strong>${esc(display)}</strong><small>@${esc(state.profile?.username || "")}</small></span><span>⌄</span></button><div class="profileMenu hidden" id="profileMenu"><button onclick="location.hash='profile'">View profile</button><button onclick="location.hash='settings'">Settings</button><button id="menuLogout">Log out</button></div></div></header><main id="page"></main></div></div>`;
+  app.innerHTML = `<div class="layout"><aside class="sidebar"><div class="brand" onclick="location.hash='home'"><img class="brandLogo" src="assets/live-coders-logo.svg" alt=""><div class="brandText"><strong>Live Coders</strong><small>Build • Connect • Grow</small></div></div><nav>${navItem("home", "⌂", "Home")}${navItem("explore", "⌕", "Explore")}${navItem("communities", "◈", "Communities")}${navItem("myCommunities", "▣", "My Communities")}${navItem("messages", "✉", "Messages")}${navItem("notifications", "●", "Notifications", unreadNotificationCount())}${navItem("profile", "◎", "Profile")}${navItem("settings", "⚙", "Settings")}</nav><div class="sidebarBottom"><button class="ghost full" id="logoutBtn">Log out</button></div></aside><div class="mainArea"><header class="topbar"><div class="mobileBrand"><img class="brandLogo small" src="assets/live-coders-logo.svg" alt=""><strong>Live Coders</strong></div><div class="globalSearch"><span>⌕</span><input id="globalSearch" value="" placeholder="Search developers, posts, communities…"></div><div class="topActions"><button class="notificationBtn" onclick="location.hash='notifications'" aria-label="Notifications" title="Notifications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M10 21h4"></path></svg><b id="notifBadge" class="notificationBadge ${unreadNotificationCount() ? "" : "hidden"}">${unreadNotificationCount()}</b></button><button class="primary" onclick="openPostModal()">+ Create Post</button><button class="topProfile" id="topProfileBtn" aria-label="Open profile">${image(avatar, display, "avatar small")}<span><strong>${esc(display)}</strong><small>@${esc(state.profile?.username || "")}</small></span><span>⌄</span></button><div class="profileMenu hidden" id="profileMenu"><button onclick="location.hash='profile'">View profile</button><button onclick="location.hash='settings'">Settings</button><button id="menuLogout">Log out</button></div></div></header><main id="page"></main></div></div>`;
   document.querySelector("#logoutBtn").onclick = () => supabase.auth.signOut();
   document.querySelector("#menuLogout").onclick = () => supabase.auth.signOut();
   document.querySelector("#topProfileBtn").onclick = () =>
@@ -338,7 +338,7 @@ function renderShell() {
       return;
     }
     trackInterest("search", q);
-    const target = `explore?q=${encodeURIComponent(q)}`;
+    const target = `search?q=${encodeURIComponent(q)}`;
     if (location.hash.slice(1) !== target) location.hash = target;
     else navigate(target);
   };
@@ -368,8 +368,9 @@ async function navigate(raw) {
   const query = new URLSearchParams(raw.split("?")[1] || "");
   try {
     if (state.route === "home") await renderHome(page);
-    else if (state.route === "explore")
-      await renderExplore(page, query.get("q") || "");
+    else if (state.route === "explore") await renderExplore(page);
+    else if (state.route === "search")
+      await renderSearch(page, query.get("q") || "");
     else if (state.route === "communities") await renderCommunities(page);
     else if (state.route === "myCommunities") await renderMyCommunities(page);
     else if (state.route === "messages") {
@@ -688,8 +689,8 @@ async function searchAll(q) {
   return normalized;
 }
 
-async function renderExplore(page, q = "") {
-  const [communities, members] = await Promise.all([
+async function renderExplore(page) {
+  const [data, members] = await Promise.all([
     fetchCommunityCatalog(),
     supabase
       .from("community_members")
@@ -701,22 +702,12 @@ async function renderExplore(page, q = "") {
       "Could not load communities",
       members.error.message,
     ));
-  let search = { users: [], posts: [], communities: [] };
-  try {
-    if (q) search = await searchAll(q);
-  } catch (error) {
-    return (page.innerHTML = empty(
-      "Search error",
-      error.message || "Try again in a moment.",
-    ));
-  }
-  if (q) trackInterest("search", q);
-
   const joinedIds = new Set((members.data || []).map((x) => x.community_id));
   const categoryList = [
+    "Startups & Founders",
+    "AI & Machine Learning",
     "Web Development",
     "Mobile Development",
-    "AI & Machine Learning",
     "Data Science",
     "Cybersecurity",
     "Cloud & DevOps",
@@ -724,7 +715,6 @@ async function renderExplore(page, q = "") {
     "Blockchain & Web3",
     "Open Source",
     "UI/UX & Design",
-    "Startups & Founders",
     "Programming Languages",
     "Career & Jobs",
     "Freelancing",
@@ -732,60 +722,76 @@ async function renderExplore(page, q = "") {
     "No-Code & Automation",
     "Trading & Finance",
   ];
-  const dbCats = communities.map((c) => c.category).filter(Boolean);
-  const categories = [...new Set([...categoryList, ...dbCats])];
-  const filtered = q ? search.communities : communities;
-  const popular = filtered.slice(0, 6);
-  const trending = [...filtered]
-    .sort((a, b) => Number(b.view_count || 0) - Number(a.view_count || 0))
+  const categories = [
+    ...new Set(
+      [
+        ...categoryList,
+        (data || []).map((c) => c.category).filter(Boolean),
+      ].flat(),
+    ),
+  ];
+  const popular = [...(data || [])]
+    .sort((a, b) => Number(b.member_count || 0) - Number(a.member_count || 0))
+    .slice(0, 6);
+  const trending = [...(data || [])]
+    .sort((a, b) => {
+      const av =
+        Number(a.view_count || 0) * 1 + Number(a.member_count || 0) * 3;
+      const bv =
+        Number(b.view_count || 0) * 1 + Number(b.member_count || 0) * 3;
+      return bv - av;
+    })
     .slice(0, 8);
 
-  page.innerHTML = `<div class="pageHead modernPageHead"><div><div class="eyebrow">DISCOVER</div><h1>${q ? `Search results for “${esc(q)}”` : "Explore Communities"}</h1><p>Find developers, posts and communities by technology, career path, project and goal.</p></div><button class="primary" onclick="openCommunityModal()">+ Create Community</button></div>
-  <div class="searchBox modernSearch"><span>⌕</span><input id="communitySearch" value="${esc(q)}" placeholder="Search developers, posts, communities…"><select id="communityCategory"><option value="">All categories</option>${categories.map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join("")}</select></div>
+  page.innerHTML = `<div class="pageHead modernPageHead"><div><div class="eyebrow">COMMUNITY NETWORK</div><h1>Find your people.</h1><p>Discover communities for building, startups, technology, trading, finance and shared goals.</p></div><button class="primary" onclick="openCommunityModal()">+ Create Community</button></div>
+  <div class="searchBox modernSearch communityOnlySearch"><span>⌕</span><input id="communitySearch" placeholder="Search communities by name, category or focus…"><select id="communityCategory"><option value="">All categories</option>${categories.map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join("")}</select></div>
   <div class="communityChips"><button class="chip active" data-category="">All</button>${categories.map((c) => `<button class="chip" data-category="${esc(c)}">${esc(c)}</button>`).join("")}</div>
-  ${
-    q
-      ? `<section class="searchResultsGrid">
-    <div class="sectionTitle"><div><h2>Developers</h2><p class="muted">${search.users.length} matches</p></div></div>
-    <div class="userGrid">${search.users.map((u) => `<article class="userCard">${image(u.avatar_url, u.display_name || u.full_name || u.username, "avatar large")}<h3>${esc(u.display_name || u.full_name || u.username)}</h3><small>@${esc(u.username || "")}</small><p>${esc(u.bio || "")}</p><button class="secondary" onclick="location.hash='user?id=${u.id}'">View profile</button></article>`).join("") || empty("No developers found", "Try another search term.")}</div>
-  </section>
-  <section class="searchResultsGrid">
-    <div class="sectionTitle"><div><h2>Posts</h2><p class="muted">${search.posts.length} matches</p></div></div>
-    <div class="feedListCompact">${search.posts.map((p) => `<article class="postSearchRow"><div><b>${esc(p.title || "Untitled")}</b><small>${esc(p.category || "Developer post")} · ${timeAgo(p.created_at)}</small><p>${esc((p.content || "").slice(0, 220))}</p></div><button class="secondary" onclick="viewPost('${p.id}')">Open</button></article>`).join("") || `<p class="muted">No posts found.</p>`}</div>
-  </section>`
-      : ""
-  }
-  <section class="exploreSection communityExplore"><div class="sectionTitle"><div><h2>${q ? "Matching communities" : "Popular Communities"}</h2><p class="muted">Communities developers are joining and exploring.</p></div><button class="linkButton" onclick="location.hash='communities'">View all →</button></div><div class="communityGrid" id="popularCommunities">${popular.map((c) => communityCard(c, joinedIds)).join("") || empty("No communities", "Create the first one.")}</div></section>
-  <section class="exploreSection"><div class="sectionTitle"><div><h2>Trending Communities</h2><p class="muted">Active communities getting attention right now.</p></div></div><div class="trendingCommunityList">${trending.map((c) => communityListRow(c, joinedIds)).join("") || `<p class="muted">No trending communities yet.</p>`}</div></section>`;
+  <section class="exploreSection communityExplore"><div class="sectionTitle"><div><h2>Popular Communities</h2><p class="muted">Communities people are joining and exploring.</p></div><button class="linkButton" onclick="location.hash='communities'">View all →</button></div><div class="communityGrid" id="popularCommunities">${popular.map((c) => communityCard(c, joinedIds)).join("") || empty("No communities", "Create the first one.")}</div></section>
+  <section class="exploreSection"><div class="sectionTitle"><div><h2>Trending Communities</h2><p class="muted">Active communities getting attention right now.</p></div></div><div class="trendingCommunityList" id="trendingCommunities">${trending.map((c) => communityListRow(c, joinedIds)).join("") || `<p class="muted">No trending communities yet.</p>`}</div></section>`;
 
   const applyFilter = () => {
-    const text = document.querySelector("#communitySearch").value.trim();
+    const term = document
+      .querySelector("#communitySearch")
+      .value.trim()
+      .toLowerCase();
     const cat = document.querySelector("#communityCategory").value;
-    trackInterest("category", cat);
-    if (text !== q) {
-      location.hash = text
-        ? `explore?q=${encodeURIComponent(text)}`
-        : "explore";
-      return;
-    }
+    trackInterest("community_search", term);
+    const rows = (data || []).filter((c) => {
+      const hay =
+        `${c.name || ""} ${c.description || ""} ${c.category || ""} ${c.location || ""}`.toLowerCase();
+      return (!term || hay.includes(term)) && (!cat || c.category === cat);
+    });
+    const pop = [...rows]
+      .sort((a, b) => Number(b.member_count || 0) - Number(a.member_count || 0))
+      .slice(0, 6);
+    const trend = [...rows]
+      .sort(
+        (a, b) =>
+          Number(b.view_count || 0) +
+          Number(b.member_count || 0) * 3 -
+          (Number(a.view_count || 0) + Number(a.member_count || 0) * 3),
+      )
+      .slice(0, 8);
+    document.querySelector("#popularCommunities").innerHTML =
+      pop.map((c) => communityCard(c, joinedIds)).join("") ||
+      empty("No matches", "Try another community search.");
+    document.querySelector("#trendingCommunities").innerHTML =
+      trend.map((c) => communityListRow(c, joinedIds)).join("") ||
+      `<p class="muted">No matching communities.</p>`;
     document
-      .querySelectorAll("#popularCommunities .communityCard")
-      .forEach(
-        (card) =>
-          (card.style.display =
-            !cat || card.dataset.category === cat ? "" : "none"),
-      );
+      .querySelectorAll(".chip")
+      .forEach((b) => b.classList.toggle("active", b.dataset.category === cat));
   };
   const input = document.querySelector("#communitySearch");
+  input.oninput = () => {
+    clearTimeout(state.searchTimer);
+    state.searchTimer = setTimeout(applyFilter, 180);
+  };
   input.onkeydown = (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
       applyFilter();
     }
-  };
-  input.oninput = () => {
-    clearTimeout(state.searchTimer);
-    state.searchTimer = setTimeout(applyFilter, 450);
   };
   document.querySelector("#communityCategory").onchange = applyFilter;
   document.querySelectorAll(".chip").forEach(
@@ -800,6 +806,39 @@ async function renderExplore(page, q = "") {
         applyFilter();
       }),
   );
+}
+
+async function renderSearch(page, q = "") {
+  const term = String(q || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .slice(0, 100);
+  if (!term)
+    return (page.innerHTML = `<div class="pageHead modernPageHead"><div><div class="eyebrow">SEARCH</div><h1>Search Live Coders</h1><p>Find developers, posts and communities from one global search.</p></div></div><div class="searchEmptyPanel">Use the search bar above to search the Live Coders network.</div>`);
+  let search;
+  let joinedIds = new Set();
+  try {
+    const [searchResult, membersQ] = await Promise.all([
+      searchAll(term),
+      supabase
+        .from("community_members")
+        .select("community_id")
+        .eq("user_id", state.session.user.id),
+    ]);
+    if (membersQ.error) throw membersQ.error;
+    search = searchResult;
+    joinedIds = new Set((membersQ.data || []).map((x) => x.community_id));
+  } catch (error) {
+    return (page.innerHTML = empty(
+      "Search error",
+      error.message || "Try again in a moment.",
+    ));
+  }
+  trackInterest("search", term);
+  page.innerHTML = `<div class="pageHead modernPageHead"><div><div class="eyebrow">GLOBAL SEARCH</div><h1>Search results for “${esc(term)}”</h1><p>Find developers, posts and communities by technology, career path, project and goal.</p></div></div>
+  <section class="searchResultsGrid"><div class="sectionTitle"><div><h2>Developers</h2><p class="muted">${search.users.length} matches</p></div></div><div class="userGrid">${search.users.map((u) => `<article class="userCard"><div class="searchCardBody">${image(u.avatar_url, u.display_name || u.full_name || u.username, "avatar large")}<h3>${esc(u.display_name || u.full_name || u.username)}</h3><small>@${esc(u.username || "")}</small><p>${esc(u.bio || "Building and growing on Live Coders.")}</p><button class="secondary" onclick="location.hash='user?id=${u.id}'">View profile</button></div></article>`).join("") || empty("No developers found", "Try another search term.")}</div></section>
+  <section class="searchResultsGrid"><div class="sectionTitle"><div><h2>Posts</h2><p class="muted">${search.posts.length} matches</p></div></div><div class="feedListCompact">${search.posts.map((p) => `<article class="postSearchRow"><div><b>${esc(p.title || "Untitled")}</b><small>${esc(p.category || "Builder post")} · ${timeAgo(p.created_at)}</small><p>${esc((p.content || "").slice(0, 220))}</p></div><button class="secondary" onclick="viewPost('${p.id}')">Open</button></article>`).join("") || `<p class="muted">No posts found.</p>`}</div></section>
+  <section class="searchResultsGrid"><div class="sectionTitle"><div><h2>Communities</h2><p class="muted">${search.communities.length} matches</p></div></div><div class="communityGrid">${search.communities.map((c) => communityCard(c, joinedIds)).join("") || empty("No communities found", "Try another search term.")}</div></section>`;
 }
 
 function recruitmentLabel(c) {
@@ -1175,7 +1214,7 @@ function communityMessageMarkup(m, communityId, channelId) {
     ? `<audio class="voicePlayer" controls src="${esc(m.voice_url)}"></audio>${m.voice_duration_seconds ? `<small class="voiceDuration">${m.voice_duration_seconds}s</small>` : ""}`
     : "";
   const body = deleted
-    ? `<span class="messageDeleted">Message deleted</span>`
+    ? `<span class="messageDeleted">Message unsent</span>`
     : `${m.content ? `<div>${esc(m.content)}</div>` : ""}${attachment}${voice}`;
   return `<div class="workspaceMessage ${own ? "mine" : ""}">
     ${image(m.sender?.avatar_url, m.sender?.display_name || m.sender?.username, "avatar tiny")}
@@ -1183,7 +1222,7 @@ function communityMessageMarkup(m, communityId, channelId) {
       <div class="workspaceMessageMeta">
         <b>${esc(m.sender?.display_name || m.sender?.username)}</b>
         <small>${timeAgo(m.created_at)}</small>
-        ${own && !deleted ? `<button class="messageMenuBtn" title="Delete message" onclick="deleteCommunityMessage('${m.id}','${communityId}','${channelId || ""}')">Delete</button>` : ""}
+        ${own && !deleted ? `<div class="messageActions"><button class="messageMenuBtn" title="Delete for me" onclick="deleteCommunityMessageForMe('${m.id}','${communityId}','${channelId || ""}')">Delete</button><button class="messageMenuBtn unsend" title="Unsend for everyone" onclick="unsendCommunityMessage('${m.id}','${communityId}','${channelId || ""}')">Unsend</button></div>` : ""}
       </div>
       <div class="workspaceBubble ${deleted ? "deleted" : ""}">${body}</div>
     </div>
@@ -1200,6 +1239,7 @@ async function refreshCommunityChat(
       "*,sender:profiles!community_messages_sender_id_fkey(username,display_name,full_name,avatar_url)",
     )
     .eq("community_id", id)
+    .not("hidden_for", "cs", `{${state.session.user.id}}`)
     .order("created_at", { ascending: true })
     .limit(200);
   if (channelId) query = query.eq("channel_id", channelId);
@@ -1416,6 +1456,7 @@ async function renderCommunityWorkspace(page, id) {
       "*,sender:profiles!community_messages_sender_id_fkey(username,display_name,full_name,avatar_url)",
     )
     .eq("community_id", id)
+    .not("hidden_for", "cs", `{${state.session.user.id}}`)
     .order("created_at", { ascending: true })
     .limit(100);
   if (activeChannel?.id)
@@ -1696,6 +1737,7 @@ async function conversationList(convs) {
       .from("messages")
       .select("content,created_at")
       .eq("conversation_id", c.id)
+      .not("hidden_for", "cs", `{${state.session.user.id}}`)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -1713,6 +1755,7 @@ async function fetchDirectMessages(id) {
       "*,sender:profiles!messages_sender_id_fkey(display_name,username,avatar_url)",
     )
     .eq("conversation_id", id)
+    .not("hidden_for", "cs", `{${state.session.user.id}}`)
     .order("created_at", { ascending: true });
   if (error) throw error;
   return data || [];
@@ -1730,9 +1773,9 @@ function directMessageMarkup(messages, id) {
           ? `<audio class="voicePlayer" controls src="${esc(m.voice_url)}"></audio>`
           : "";
         const body = deleted
-          ? `<span class="messageDeleted">Message deleted</span>`
+          ? `<span class="messageDeleted">Message unsent</span>`
           : `${m.content ? `<div>${esc(m.content)}</div>` : ""}${attachment}${voice}`;
-        return `<div class="igMessage ${own ? "mine" : ""}"><div class="bubble ${deleted ? "deleted" : ""}">${body}${own && !deleted ? `<button class="messageMenuBtn" title="Delete message" onclick="deleteDirectMessage('${m.id}','${id}')">Delete</button>` : ""}<small>${timeAgo(m.created_at)}</small></div></div>`;
+        return `<div class="igMessage ${own ? "mine" : ""}"><div class="bubble ${deleted ? "deleted" : ""}">${body}${own && !deleted ? `<div class="messageActions"><button class="messageMenuBtn" title="Delete for me" onclick="deleteDirectMessageForMe('${m.id}','${id}')">Delete</button><button class="messageMenuBtn unsend" title="Unsend for everyone" onclick="unsendDirectMessage('${m.id}','${id}')">Unsend</button></div>` : ""}<small>${timeAgo(m.created_at)}</small></div></div>`;
       })
       .join("") ||
     `<div class="chatEmpty"><div>💬</div><p>No messages yet.</p><small>Start the conversation.</small></div>`
@@ -2009,48 +2052,73 @@ window.toggleCommunityChannelLock = async function (
   await renderCommunityWorkspace(document.querySelector("#page"), communityId);
 };
 
-window.deleteCommunityMessage = async function (
+window.deleteCommunityMessageForMe = async function (
   messageId,
   communityId,
   channelId,
 ) {
-  if (
-    !confirm(
-      "Delete this message? It will be removed for everyone in this channel.",
-    )
-  )
+  if (!confirm("Delete this message for you? Other members will still see it."))
     return;
-  const { error } = await supabase.rpc("delete_community_message", {
+  const { error } = await supabase.rpc("delete_community_message_for_me", {
     message_id_input: messageId,
   });
   if (error) toast(error.message, "error");
   else {
-    toast("Message deleted.", "success");
+    toast("Message deleted for you.", "success");
     await refreshCommunityChat(
       communityId,
       channelId || state.selectedCommunityChannel,
     );
   }
 };
-window.deleteDirectMessage = async function (messageId, conversationId) {
+window.deleteDirectMessageForMe = async function (messageId, conversationId) {
   if (
-    !confirm(
-      "Delete this message? It will be removed for everyone in this conversation.",
-    )
+    !confirm("Delete this message for you? The other person will still see it.")
   )
     return;
-  const { error } = await supabase.rpc("delete_direct_message", {
+  const { error } = await supabase.rpc("delete_direct_message_for_me", {
     message_id_input: messageId,
   });
   if (error) toast(error.message, "error");
   else {
-    toast("Message deleted.", "success");
+    toast("Message deleted for you.", "success");
     await loadChat(conversationId);
   }
 };
-// Backwards-compatible aliases for any older UI hooks.
-window.unsendCommunityMessage = window.deleteCommunityMessage;
-window.unsendDirectMessage = window.deleteDirectMessage;
+window.unsendCommunityMessage = async function (
+  messageId,
+  communityId,
+  channelId,
+) {
+  if (!confirm("Unsend this message for everyone? This cannot be undone."))
+    return;
+  const { error } = await supabase.rpc("unsend_community_message", {
+    message_id_input: messageId,
+  });
+  if (error) toast(error.message, "error");
+  else {
+    toast("Message unsent.", "success");
+    await refreshCommunityChat(
+      communityId,
+      channelId || state.selectedCommunityChannel,
+    );
+  }
+};
+window.unsendDirectMessage = async function (messageId, conversationId) {
+  if (!confirm("Unsend this message for everyone? This cannot be undone."))
+    return;
+  const { error } = await supabase.rpc("unsend_direct_message", {
+    message_id_input: messageId,
+  });
+  if (error) toast(error.message, "error");
+  else {
+    toast("Message unsent.", "success");
+    await loadChat(conversationId);
+  }
+};
+// Legacy delete hooks now intentionally map to delete-for-me.
+window.deleteCommunityMessage = window.deleteCommunityMessageForMe;
+window.deleteDirectMessage = window.deleteDirectMessageForMe;
 window.openCommunityChatSettings = function (communityId, channelId) {
   modal(
     `<h2>Chat settings</h2><p class="muted">Delete this channel's chat history from your view.</p><button class="danger full" onclick="clearCommunityChatHistory('${communityId}','${channelId}')">Delete chat history</button>`,

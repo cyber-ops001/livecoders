@@ -6683,3 +6683,84 @@ img {
     width: 100%;
   }
 }
+
+/* V20 production polish */
+.globalSearch {
+  flex: 0 1 560px;
+  min-width: 240px;
+}
+.globalSearch:focus-within {
+  border-color: #2f7cff;
+  box-shadow: 0 0 0 3px rgba(47, 124, 255, 0.12);
+}
+.communityOnlySearch {
+  max-width: 1240px;
+}
+.communityOnlySearch input {
+  flex: 1;
+  min-width: 0;
+}
+.searchResultsGrid {
+  scroll-margin-top: 90px;
+}
+.searchEmptyPanel {
+  max-width: 1240px;
+  margin: 0 auto 40px;
+  padding: 34px 30px;
+  border: 1px dashed #263a54;
+  border-radius: 14px;
+  background: #0b1523;
+  color: #8fa1b7;
+}
+.searchCardBody {
+  padding: 20px;
+}
+.messageActions {
+  display: flex;
+  gap: 7px;
+  justify-content: flex-end;
+  margin-top: 3px;
+}
+.messageMenuBtn {
+  font-size: 10px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  padding: 4px 7px;
+  background: rgba(83, 139, 214, 0.08);
+  color: #7eabec;
+}
+.messageMenuBtn.unsend {
+  color: #ff8d9d;
+  background: rgba(239, 68, 68, 0.07);
+}
+.messageMenuBtn:hover {
+  background: rgba(83, 139, 214, 0.18);
+}
+.messageMenuBtn.unsend:hover {
+  background: rgba(239, 68, 68, 0.14);
+}
+.landingPage .landingHero h1 span {
+  background: linear-gradient(90deg, #66a8ff, #a88cff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.landingCategoryGrid span {
+  border-color: #223754;
+}
+@media (max-width: 760px) {
+  .globalSearch {
+    flex: 1;
+    min-width: 0;
+  }
+  .communityOnlySearch {
+    display: flex !important;
+  }
+  .communityOnlySearch select {
+    margin-left: 0;
+  }
+  .messageActions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
