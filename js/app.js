@@ -14,6 +14,10 @@ const state = {
   ),
   messageDrafts: {},
   publicAuthMode: "login",
+  cache: {
+    communities: { data: null, at: 0 },
+    search: new Map(),
+  },
 };
 
 const app = document.querySelector("#app");
@@ -151,9 +155,7 @@ async function bootstrap() {
       ? renderAuth(location.hash.slice(1))
       : renderLanding();
   document.documentElement.dataset.public = "";
-  await profile();
-  await loadInterestSignals();
-  await loadNotifications();
+  await Promise.all([profile(), loadInterestSignals(), loadNotifications()]);
   renderShell();
   await navigate(location.hash.slice(1) || "home");
   subscribeRealtime();
@@ -163,9 +165,7 @@ supabase.auth.onAuthStateChange(async (_event, session) => {
   state.session = session;
   if (session) {
     document.documentElement.dataset.public = "";
-    await profile();
-    await loadInterestSignals();
-    await loadNotifications();
+    await Promise.all([profile(), loadInterestSignals(), loadNotifications()]);
     renderShell();
     await navigate(location.hash.slice(1) || "home");
     subscribeRealtime();
@@ -200,7 +200,7 @@ function renderLanding() {
     </section>
     <section class="landingStats"><div><b>Build</b><span>Share what you're making</span></div><div><b>Connect</b><span>Meet developers with shared momentum</span></div><div><b>Grow</b><span>Learn through communities and conversations</span></div></section>
     <section id="features" class="landingSection"><div class="landingSectionHead"><div class="eyebrow">ONE PLACE TO BUILD</div><h2>Everything a developer community needs.</h2><p>Designed around builders instead of endless noise.</p></div><div class="landingFeatureGrid"><article><span>01</span><h3>Smart developer feed</h3><p>Your feed learns from searches, communities, posts and creators you interact with. No interest questionnaire.</p></article><article><span>02</span><h3>Focused communities</h3><p>Join communities by type — Startups, AI/ML, Web Development, Cybersecurity, Open Source and more.</p></article><article><span>03</span><h3>Build stories</h3><p>Publish quick posts, long-form multi-page blogs or short build reels showing what you are shipping.</p></article><article><span>04</span><h3>Real conversations</h3><p>Use community channels and direct messages to ask questions, collaborate and share progress.</p></article><article><span>05</span><h3>Developer profiles</h3><p>Show projects, skills, experience and the work you are actually building.</p></article><article><span>06</span><h3>Made for every screen</h3><p>A responsive interface that adapts cleanly from phones to large desktop displays.</p></article></div></section>
-    <section id="communities" class="landingDarkSection"><div class="landingSectionHead"><div class="eyebrow">FIND YOUR PEOPLE</div><h2>Communities with a purpose.</h2><p>Every community chooses its own category, rules and focus.</p></div><div class="landingCategoryGrid">${["Startups & Founders", "AI & Machine Learning", "Web Development", "Mobile Development", "Cybersecurity", "Cloud & DevOps", "Game Development", "Open Source", "UI/UX & Design", "Blockchain & Web3", "Programming Languages", "Career & Jobs"].map((x) => `<span>${esc(x)}</span>`).join("")}</div></section>
+    <section id="communities" class="landingDarkSection"><div class="landingSectionHead"><div class="eyebrow">FIND YOUR PEOPLE</div><h2>Communities with a purpose.</h2><p>Every community chooses its own category, rules and focus.</p></div><div class="landingCategoryGrid">${["Startups & Founders", "AI & Machine Learning", "Web Development", "Mobile Development", "Cybersecurity", "Cloud & DevOps", "Game Development", "Open Source", "UI/UX & Design", "Blockchain & Web3", "Programming Languages", "Career & Jobs", "Trading & Finance"].map((x) => `<span>${esc(x)}</span>`).join("")}</div></section>
     <section id="builders" class="landingSection landingBuilder"><div><div class="eyebrow">FOR PEOPLE WHO SHIP</div><h2>Stop building alone.</h2><p>Find the right community, share the next version, ask for help and keep the momentum going.</p></div><button class="primary landingCta" onclick="showAuth('signup')">Join Live Coders →</button></section>
     <footer class="landingFooter"><span>© ${new Date().getFullYear()} Live Coders</span><span>Build. Ask. Connect. Solve.</span></footer>
   </main>`;
@@ -330,13 +330,23 @@ function renderShell() {
     { once: true },
   );
   const search = document.querySelector("#globalSearch");
+  const runGlobalSearch = () => {
+    clearTimeout(state.searchTimer);
+    const q = search.value.trim();
+    if (q) trackInterest("search", q);
+    location.hash = q ? `explore?q=${encodeURIComponent(q)}` : "explore";
+  };
   search.oninput = () => {
     clearTimeout(state.searchTimer);
     const q = search.value.trim();
-    state.searchTimer = setTimeout(() => {
-      if (q) trackInterest("search", q);
-      location.hash = q ? `explore?q=${encodeURIComponent(q)}` : "explore";
-    }, 180);
+    if (!q) return;
+    state.searchTimer = setTimeout(runGlobalSearch, 500);
+  };
+  search.onkeydown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      runGlobalSearch();
+    }
   };
 }
 async function navigate(raw) {
@@ -396,11 +406,25 @@ async function getPosts(filter = {}) {
       "*,author:profiles!posts_author_id_fkey(id,username,display_name,full_name,avatar_url)",
     )
     .order("created_at", { ascending: false })
-    .limit(80);
+    .limit(40);
   if (filter.author) q = q.eq("author_id", filter.author);
   const { data, error } = await q;
   if (error) throw error;
   const posts = data || [];
+  if (posts.length && state.session?.user?.id) {
+    const { data: likedRows } = await supabase
+      .from("post_likes")
+      .select("post_id")
+      .eq("user_id", state.session.user.id)
+      .in(
+        "post_id",
+        posts.map((p) => p.id),
+      );
+    const likedSet = new Set((likedRows || []).map((x) => x.post_id));
+    posts.forEach((p) => {
+      p._liked = likedSet.has(p.id);
+    });
+  }
   let friendIds = new Set();
   if (!filter.author) {
     const [{ data: following }, { data: followers }] = await Promise.all([
@@ -443,12 +467,17 @@ function renderBlogGallery(pages = []) {
 async function postCard(p) {
   trackInterest("category", p.category || "");
   (p.tags || []).slice(0, 5).forEach((t) => trackInterest("topic", t));
-  const { data: liked } = await supabase
-    .from("post_likes")
-    .select("post_id")
-    .eq("post_id", p.id)
-    .eq("user_id", state.session.user.id)
-    .maybeSingle();
+  const liked =
+    p._liked !== undefined
+      ? p._liked
+      : !!(
+          await supabase
+            .from("post_likes")
+            .select("post_id")
+            .eq("post_id", p.id)
+            .eq("user_id", state.session.user.id)
+            .maybeSingle()
+        ).data;
   const author = p.author || {};
   const pages = Array.isArray(p.body_pages) ? p.body_pages : [];
   const type =
@@ -613,52 +642,97 @@ async function viewPost(id) {
 }
 window.viewPost = viewPost;
 
-async function renderExplore(page, q = "") {
-  const like = q
-    ? `%${q.replaceAll("%", "\\%").replaceAll("_", "\\_")}%`
-    : null;
-  const [users, posts, communities, members] = await Promise.all([
-    q
-      ? supabase
-          .from("profiles")
-          .select(
-            "id,username,display_name,full_name,avatar_url,bio,skills,location",
-          )
-          .or(
-            `username.ilike.${like},display_name.ilike.${like},full_name.ilike.${like},bio.ilike.${like},location.ilike.${like}`,
-          )
-          .limit(30)
-      : Promise.resolve({ data: [], error: null }),
-    q
-      ? supabase
-          .from("posts")
-          .select(
-            "*,author:profiles!posts_author_id_fkey(id,username,display_name,full_name,avatar_url,location)",
-          )
-          .or(`title.ilike.${like},content.ilike.${like}`)
-          .order("created_at", { ascending: false })
-          .limit(30)
-      : Promise.resolve({ data: [], error: null }),
+async function fetchCommunityCatalog(force = false) {
+  const now = Date.now();
+  if (
+    !force &&
+    state.cache.communities.data &&
+    now - state.cache.communities.at < 30000
+  )
+    return state.cache.communities.data;
+  const { data, error } = await supabase
+    .from("communities")
+    .select(
+      "id,name,description,logo_url,category,member_count,view_count,recruitment_enabled,recruitment_mode,location,remote_mode,creator_id",
+    )
+    .order("member_count", { ascending: false })
+    .limit(60);
+  if (error) throw error;
+  state.cache.communities = { data: data || [], at: now };
+  return data || [];
+}
+
+async function searchAll(q) {
+  const term = String(q || "").trim();
+  if (!term) return { users: [], posts: [], communities: [] };
+  const key = term.toLowerCase();
+  const cached = state.cache.search.get(key);
+  if (cached && Date.now() - cached.at < 15000) return cached.data;
+  const like = `%${term.replaceAll("%", "\\%").replaceAll("_", "\\_")}%`;
+  const [users, posts, communities] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select(
+        "id,username,display_name,full_name,avatar_url,bio,skills,location",
+      )
+      .or(
+        `username.ilike.${like},display_name.ilike.${like},full_name.ilike.${like},bio.ilike.${like},location.ilike.${like}`,
+      )
+      .limit(20),
+    supabase
+      .from("posts")
+      .select(
+        "id,title,content,category,post_type,created_at,author_id,like_count,comment_count,view_count,author:profiles!posts_author_id_fkey(id,username,display_name,full_name,avatar_url)",
+      )
+      .or(`title.ilike.${like},content.ilike.${like},category.ilike.${like}`)
+      .order("created_at", { ascending: false })
+      .limit(20),
     supabase
       .from("communities")
-      .select("*")
+      .select(
+        "id,name,description,logo_url,category,member_count,view_count,recruitment_enabled,recruitment_mode,location,remote_mode,creator_id",
+      )
+      .or(
+        `name.ilike.${like},description.ilike.${like},category.ilike.${like},location.ilike.${like}`,
+      )
       .order("member_count", { ascending: false })
-      .limit(80),
+      .limit(20),
+  ]);
+  const error = users.error || posts.error || communities.error;
+  if (error) throw error;
+  const data = {
+    users: users.data || [],
+    posts: posts.data || [],
+    communities: communities.data || [],
+  };
+  state.cache.search.set(key, { data, at: Date.now() });
+  return data;
+}
+
+async function renderExplore(page, q = "") {
+  const [communities, members] = await Promise.all([
+    fetchCommunityCatalog(),
     supabase
       .from("community_members")
       .select("community_id")
       .eq("user_id", state.session.user.id),
   ]);
-  if (users.error || posts.error || communities.error || members.error)
+  if (members.error)
+    return (page.innerHTML = empty(
+      "Could not load communities",
+      members.error.message,
+    ));
+  let search = { users: [], posts: [], communities: [] };
+  try {
+    if (q) search = await searchAll(q);
+  } catch (error) {
     return (page.innerHTML = empty(
       "Search error",
-      users.error?.message ||
-        posts.error?.message ||
-        communities.error?.message ||
-        members.error?.message ||
-        "Try again in a moment.",
+      error.message || "Try again in a moment.",
     ));
+  }
   if (q) trackInterest("search", q);
+
   const joinedIds = new Set((members.data || []).map((x) => x.community_id));
   const categoryList = [
     "Web Development",
@@ -677,48 +751,62 @@ async function renderExplore(page, q = "") {
     "Freelancing",
     "Robotics & IoT",
     "No-Code & Automation",
+    "Trading & Finance",
   ];
-  const dbCats = [
-    ...(communities.data || []).map((c) => c.category).filter(Boolean),
-  ];
+  const dbCats = communities.map((c) => c.category).filter(Boolean);
   const categories = [...new Set([...categoryList, ...dbCats])];
-  const filtered = q
-    ? (communities.data || []).filter((c) =>
-        [c.name, c.description, c.category, c.location].some((v) =>
-          String(v || "")
-            .toLowerCase()
-            .includes(q.toLowerCase()),
-        ),
-      )
-    : communities.data || [];
+  const filtered = q ? search.communities : communities;
   const popular = filtered.slice(0, 6);
   const trending = [...filtered]
-    .sort(
-      (a, b) =>
-        Number(b.view_count || 0) +
-        Number(b.member_count || 0) -
-        (Number(a.view_count || 0) + Number(a.member_count || 0)),
-    )
-    .slice(0, 10);
-  page.innerHTML = `<div class="pageHead modernPageHead"><div><div class="eyebrow">DISCOVER</div><h1>Explore Communities</h1><p>Find developer communities by technology, career path, project and goal.</p></div><button class="primary" onclick="openCommunityModal()">+ Create Community</button></div><div class="searchBox modernSearch"><span>⌕</span><input id="communitySearch" value="${esc(q)}" placeholder="Search communities, technologies, goals…"><select id="communityCategory"><option value="">All categories</option>${categories.map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join("")}</select></div><div class="communityChips"><button class="chip active" data-category="">All</button>${categories.map((c) => `<button class="chip" data-category="${esc(c)}">${esc(c)}</button>`).join("")}</div><div class="exploreSection communityExplore"><section><div class="sectionTitle"><div><h2>Popular Communities</h2><p class="muted">Start with communities developers are actively joining.</p></div><button class="linkButton" onclick="location.hash='communities'">View all →</button></div><div class="communityGrid" id="popularCommunities">${popular.map((c) => communityCard(c, joinedIds)).join("") || empty("No communities", "Create the first one.")}</div></section>${q ? `<section id="searchResults"><div class="sectionTitle"><div><h2>Developer & Post Results</h2><p class="muted">Results for “${esc(q)}”.</p></div></div><div class="userGrid">${(users.data || []).map((u) => `<article class="userCard">${image(u.avatar_url, u.display_name || u.full_name || u.username, "avatar large")}<h3>${esc(u.display_name || u.full_name || u.username)}</h3><p>@${esc(u.username)}</p><p>${esc(u.bio || "Developer and builder.")}</p><button class="secondary full" onclick="location.hash='user?id=${u.id}'">View profile</button></article>`).join("") || empty("No developers", "Try another search.")}</div></section>` : ""}<section><div class="sectionTitle"><div><h2>Trending Communities</h2><p class="muted">Popular right now based on activity and views.</p></div></div><div class="trendingCommunityList">${trending.map((c) => `<div class="trendingCommunityRow">${image(c.logo_url, c.name, "communityIcon small")}<div><b>${esc(c.name)}</b><small>${esc(c.category || "Community")} · ${Number(c.member_count || 0).toLocaleString()} members</small><p>${esc(c.description || "Developer community")}</p></div><div class="trendMetric">↗ ${Number(c.view_count || 0).toLocaleString()}<small>views</small></div><div>${joinedIds.has(c.id) ? `<button class="secondary" onclick="location.hash='community?id=${c.id}'">View</button>` : `<button class="primary" onclick="location.hash='community?id=${c.id}'">View & Join</button>`}</div></div>`).join("") || `<div class="sideMuted">No communities found.</div>`}</div></section></div>`;
+    .sort((a, b) => Number(b.view_count || 0) - Number(a.view_count || 0))
+    .slice(0, 8);
+
+  page.innerHTML = `<div class="pageHead modernPageHead"><div><div class="eyebrow">DISCOVER</div><h1>${q ? `Search results for “${esc(q)}”` : "Explore Communities"}</h1><p>Find developers, posts and communities by technology, career path, project and goal.</p></div><button class="primary" onclick="openCommunityModal()">+ Create Community</button></div>
+  <div class="searchBox modernSearch"><span>⌕</span><input id="communitySearch" value="${esc(q)}" placeholder="Search developers, posts, communities…"><select id="communityCategory"><option value="">All categories</option>${categories.map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join("")}</select></div>
+  <div class="communityChips"><button class="chip active" data-category="">All</button>${categories.map((c) => `<button class="chip" data-category="${esc(c)}">${esc(c)}</button>`).join("")}</div>
+  ${
+    q
+      ? `<section class="searchResultsGrid">
+    <div class="sectionTitle"><div><h2>Developers</h2><p class="muted">${search.users.length} matches</p></div></div>
+    <div class="userGrid">${search.users.map((u) => `<article class="userCard">${image(u.avatar_url, u.display_name || u.full_name || u.username, "avatar large")}<h3>${esc(u.display_name || u.full_name || u.username)}</h3><small>@${esc(u.username || "")}</small><p>${esc(u.bio || "")}</p><button class="secondary" onclick="location.hash='user?id=${u.id}'">View profile</button></article>`).join("") || empty("No developers found", "Try another search term.")}</div>
+  </section>
+  <section class="searchResultsGrid">
+    <div class="sectionTitle"><div><h2>Posts</h2><p class="muted">${search.posts.length} matches</p></div></div>
+    <div class="feedListCompact">${search.posts.map((p) => `<article class="postSearchRow"><div><b>${esc(p.title || "Untitled")}</b><small>${esc(p.category || "Developer post")} · ${timeAgo(p.created_at)}</small><p>${esc((p.content || "").slice(0, 220))}</p></div><button class="secondary" onclick="viewPost('${p.id}')">Open</button></article>`).join("") || `<p class="muted">No posts found.</p>`}</div>
+  </section>`
+      : ""
+  }
+  <section class="exploreSection communityExplore"><div class="sectionTitle"><div><h2>${q ? "Matching communities" : "Popular Communities"}</h2><p class="muted">Communities developers are joining and exploring.</p></div><button class="linkButton" onclick="location.hash='communities'">View all →</button></div><div class="communityGrid" id="popularCommunities">${popular.map((c) => communityCard(c, joinedIds)).join("") || empty("No communities", "Create the first one.")}</div></section>
+  <section class="exploreSection"><div class="sectionTitle"><div><h2>Trending Communities</h2><p class="muted">Active communities getting attention right now.</p></div></div><div class="trendingCommunityList">${trending.map((c) => communityListRow(c, joinedIds)).join("") || `<p class="muted">No trending communities yet.</p>`}</div></section>`;
+
   const applyFilter = () => {
     const text = document.querySelector("#communitySearch").value.trim();
     const cat = document.querySelector("#communityCategory").value;
     trackInterest("category", cat);
-    location.hash = `explore${text ? `?q=${encodeURIComponent(text)}` : ""}`;
-    setTimeout(() => {
-      const cards = document.querySelectorAll(
-        "#popularCommunities .communityCard",
+    if (text !== q) {
+      location.hash = text
+        ? `explore?q=${encodeURIComponent(text)}`
+        : "explore";
+      return;
+    }
+    document
+      .querySelectorAll("#popularCommunities .communityCard")
+      .forEach(
+        (card) =>
+          (card.style.display =
+            !cat || card.dataset.category === cat ? "" : "none"),
       );
-      cards.forEach((card) => {
-        card.style.display =
-          !cat || card.dataset.category === cat ? "" : "none";
-      });
-    }, 0);
   };
-  document.querySelector("#communitySearch").oninput = () => {
+  const input = document.querySelector("#communitySearch");
+  input.onkeydown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      applyFilter();
+    }
+  };
+  input.oninput = () => {
     clearTimeout(state.searchTimer);
-    state.searchTimer = setTimeout(() => applyFilter(), 280);
+    state.searchTimer = setTimeout(applyFilter, 450);
   };
   document.querySelector("#communityCategory").onchange = applyFilter;
   document.querySelectorAll(".chip").forEach(
@@ -730,54 +818,163 @@ async function renderExplore(page, q = "") {
         ch.classList.add("active");
         document.querySelector("#communityCategory").value =
           ch.dataset.category;
-        document
-          .querySelectorAll("#popularCommunities .communityCard")
-          .forEach(
-            (card) =>
-              (card.style.display =
-                !ch.dataset.category ||
-                card.dataset.category === ch.dataset.category
-                  ? ""
-                  : "none"),
-          );
-        trackInterest("category", ch.dataset.category);
+        applyFilter();
       }),
   );
 }
+
+function recruitmentLabel(c) {
+  const mode =
+    c.recruitment_mode || (!c.recruitment_enabled ? "closed" : "application");
+  return mode === "open"
+    ? "Open recruitment"
+    : mode === "application"
+      ? "Application required"
+      : "Closed";
+}
+function communityListRow(c, joinedIds = new Set()) {
+  const joined = joinedIds.has(c.id) || c._joined;
+  const mode =
+    c.recruitment_mode || (!c.recruitment_enabled ? "closed" : "application");
+  const action = joined
+    ? `<button class="primary" onclick="location.hash='communityChat?id=${c.id}'">Open</button>`
+    : mode === "open"
+      ? `<button class="primary" onclick="joinCommunity('${c.id}')">Join</button>`
+      : mode === "application"
+        ? `<button class="primary" onclick="applyCommunity('${c.id}')">Apply</button>`
+        : `<button class="secondary" disabled>Closed</button>`;
+  return `<article class="trendingCommunityRow">${image(c.logo_url, c.name, "communityIcon medium")}<div class="trendingCommunityInfo"><b>${esc(c.name)}</b><small>${esc(c.category || "Community")} · ${Number(c.member_count || 0).toLocaleString()} members · ${recruitmentLabel(c)}</small><p>${esc(c.description || "")}</p></div>${action}</article>`;
+}
 function communityCard(c, joinedIds = new Set()) {
   const joined = joinedIds.has(c.id) || c._joined;
-  return `<article class="communityCard" data-category="${esc(c.category || "")}"><div class="communityCardCover">${image(c.logo_url, c.name, "communityIcon xl")}</div><div class="communityCardBody"><span class="categoryPill">${esc(c.category || "Community")}</span><h3>${esc(c.name)}</h3><p>${esc(c.description || "Connect, share knowledge and build together.")}</p><small>${Number(c.member_count || 0).toLocaleString()} members · ${Number(c.view_count || 0).toLocaleString()} views</small><div class="communityCardActions"><button class="secondary" onclick="location.hash='community?id=${c.id}'">View community</button>${joined ? `<button class="primary" onclick="location.hash='communityChat?id=${c.id}'">Open</button>` : `<button class="primary" onclick="joinCommunity('${c.id}')">Join</button>`}</div></div></article>`;
+  const mode =
+    c.recruitment_mode || (!c.recruitment_enabled ? "closed" : "application");
+  const action = joined
+    ? `<button class="primary" onclick="location.hash='communityChat?id=${c.id}'">Open</button>`
+    : mode === "open"
+      ? `<button class="primary" onclick="joinCommunity('${c.id}')">Join</button>`
+      : mode === "application"
+        ? `<button class="primary" onclick="applyCommunity('${c.id}')">Apply to join</button>`
+        : `<button class="secondary" disabled>Recruitment closed</button>`;
+  return `<article class="communityCard" data-category="${esc(c.category || "")}"><div class="communityCardCover">${image(c.logo_url, c.name, "communityIcon xl")}</div><div class="communityCardBody"><span class="categoryPill">${esc(c.category || "Community")}</span><h3>${esc(c.name)}</h3><p>${esc(c.description || "Connect, share knowledge and build together.")}</p><small>${Number(c.member_count || 0).toLocaleString()} members · ${Number(c.view_count || 0).toLocaleString()} views</small><small class="recruitmentPill">${recruitmentLabel(c)}</small><div class="communityCardActions"><button class="secondary" onclick="location.hash='community?id=${c.id}'">View community</button>${action}</div></div></article>`;
 }
+
 window.joinCommunity = async function (id) {
-  const { data, error } = await supabase
+  const { data: existing } = await supabase
     .from("community_members")
-    .insert({ community_id: id, user_id: state.session.user.id });
-  if (error)
+    .select("community_id")
+    .eq("community_id", id)
+    .eq("user_id", state.session.user.id)
+    .maybeSingle();
+  if (existing) return navigate(`communityChat?id=${id}`);
+  const { data: community, error: communityError } = await supabase
+    .from("communities")
+    .select("recruitment_mode,recruitment_enabled")
+    .eq("id", id)
+    .single();
+  if (communityError) return toast(communityError.message, "error");
+  const mode =
+    community.recruitment_mode ||
+    (!community.recruitment_enabled ? "closed" : "application");
+  if (mode === "application") return applyCommunity(id);
+  if (mode === "closed")
     return toast(
-      error.message.includes("duplicate")
-        ? "You are already a member of this community."
-        : error.message,
+      "This community is not accepting new members right now.",
       "error",
     );
+  const { error } = await supabase.rpc("join_open_community", {
+    community_id_input: id,
+  });
+  if (error) return toast(error.message, "error");
+  state.cache.communities.at = 0;
+  state.cache.search.clear();
   toast("Joined community.", "success");
   navigate(`communityChat?id=${id}`);
 };
+
+window.applyCommunity = async (id) => {
+  const { data: community, error: communityError } = await supabase
+    .from("communities")
+    .select("recruitment_mode,recruitment_enabled")
+    .eq("id", id)
+    .single();
+  if (communityError) return toast(communityError.message, "error");
+  const mode =
+    community.recruitment_mode ||
+    (!community.recruitment_enabled ? "closed" : "application");
+  if (mode === "open") return joinCommunity(id);
+  if (mode === "closed")
+    return toast("Recruitment is closed for this community.", "error");
+  const { data: member } = await supabase
+    .from("community_members")
+    .select("community_id")
+    .eq("community_id", id)
+    .eq("user_id", state.session.user.id)
+    .maybeSingle();
+  if (member) return navigate(`communityChat?id=${id}`);
+  const { data: existing } = await supabase
+    .from("community_applications")
+    .select("id,status")
+    .eq("community_id", id)
+    .eq("applicant_id", state.session.user.id)
+    .maybeSingle();
+  if (existing?.status === "pending")
+    return toast("Your application is already pending.", "info");
+  const { error } = existing
+    ? await supabase
+        .from("community_applications")
+        .update({
+          status: "pending",
+          answers: {},
+          reviewed_by: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", existing.id)
+    : await supabase
+        .from("community_applications")
+        .insert({
+          community_id: id,
+          applicant_id: state.session.user.id,
+          answers: {},
+        });
+  if (error) toast(error.message, "error");
+  else {
+    toast("Application sent.", "success");
+    navigate(`community?id=${id}`);
+  }
+};
+
 async function renderCommunities(page) {
-  const [{ data, error }, { data: members, error: memberError }] =
-    await Promise.all([
-      supabase
-        .from("communities")
-        .select("*")
-        .order("member_count", { ascending: false }),
-      supabase
-        .from("community_members")
-        .select("community_id")
-        .eq("user_id", state.session.user.id),
-    ]);
-  if (error || memberError) throw error || memberError;
-  const joinedIds = new Set((members || []).map((x) => x.community_id));
+  const [data, membersQ] = await Promise.all([
+    fetchCommunityCatalog(),
+    supabase
+      .from("community_members")
+      .select("community_id")
+      .eq("user_id", state.session.user.id),
+  ]);
+  if (membersQ.error) throw membersQ.error;
+  const joinedIds = new Set((membersQ.data || []).map((x) => x.community_id));
   const categories = [
-    ...new Set((data || []).map((c) => c.category).filter(Boolean)),
+    ...new Set([
+      "Startups & Founders",
+      "AI & Machine Learning",
+      "Web Development",
+      "Mobile Development",
+      "Data Science",
+      "Cybersecurity",
+      "Cloud & DevOps",
+      "Game Development",
+      "Blockchain & Web3",
+      "Open Source",
+      "UI/UX & Design",
+      "Programming Languages",
+      "Career & Jobs",
+      "Freelancing",
+      "Robotics & IoT",
+      "No-Code & Automation",
+      "Trading & Finance",
+      ...(data || []).map((c) => c.category).filter(Boolean),
+    ]),
   ];
   page.innerHTML = `<div class="pageHead modernPageHead"><div><div class="eyebrow">COMMUNITY NETWORK</div><h1>Find your people.</h1><p>Join communities, share knowledge, collaborate and grow with developers.</p></div><button class="primary" onclick="openCommunityModal()">+ Create Community</button></div><div class="communityExplore"><div class="searchBox"><span>⌕</span><input id="allCommunitySearch" placeholder="Search communities..."><select id="allCommunityCategory"><option value="">All Categories</option>${categories.map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join("")}</select></div><div class="communityChips"><button class="chip active" data-category="">All</button>${categories.map((c) => `<button class="chip" data-category="${esc(c)}">${esc(c)}</button>`).join("")}</div><div class="communityGrid pageGrid" id="allCommunitiesGrid">${(data || []).map((c) => communityCard(c, joinedIds)).join("") || empty("No communities", "Create the first one.")}</div></div>`;
   const input = document.querySelector("#allCommunitySearch"),
@@ -1126,6 +1323,7 @@ async function renderCommunityOverview(page, id) {
     "Freelancing",
     "Robotics & IoT",
     "No-Code & Automation",
+    "Trading & Finance",
   ];
   page.innerHTML = `<div class="communityOverview"><button class="back" onclick="history.back()">← Back to communities</button><div class="communityOverviewHero" ${c.banner_url ? `style="background-image:linear-gradient(90deg,rgba(4,10,20,.94),rgba(4,10,20,.35)),url('${esc(c.banner_url)}')"` : ""}><div>${image(c.logo_url, c.name, "communityIcon xxl")}</div><div class="communityOverviewIdentity"><span class="categoryPill">${esc(c.category || "Community")}</span><h1>${esc(c.name)}</h1><p>${esc(c.description || "A community for developers and builders.")}</p><div class="overviewStats"><span><b>${Number(c.member_count || 0).toLocaleString()}</b> members</span><span><b>${Number(c.view_count || 0).toLocaleString()}</b> views</span><span>${esc(c.remote_mode || "Remote")}</span><span>${esc(c.location || "Global")}</span></div></div></div><div class="communityOverviewGrid"><main><section class="overviewCard"><h2>About this community</h2><p>${esc(c.description || "No additional description yet.")}</p><div class="overviewTwoCol"><div><h3>What you'll find</h3><div class="tagCloud">${
     (c.required_skills || [])
@@ -1135,7 +1333,7 @@ async function renderCommunityOverview(page, id) {
       .slice(0, 4)
       .map((x) => `<span class="tag">${x}</span>`)
       .join("")
-  }</div></div><div><h3>Community type</h3><p class="muted">${c.recruitment_enabled ? "Recruitment and collaboration enabled." : "Open developer discussion and collaboration."}</p><p class="muted">${esc(c.rules || "Be respectful, share useful work, and help other builders.")}</p></div></div></section><section class="overviewCard"><div class="sectionTitle"><div><h2>Members</h2><p class="muted">People building inside this community.</p></div><button class="linkButton" onclick="openPeopleListForCommunity('${id}')">View all →</button></div><div class="memberPreviewGrid">${
+  }</div></div><div><h3>Community type</h3><p class="muted">Recruitment: ${esc(recruitmentLabel(c))}.</p><p class="muted">${esc(c.rules || "Be respectful, share useful work, and help other builders.")}</p></div></div></section><section class="overviewCard"><div class="sectionTitle"><div><h2>Members</h2><p class="muted">People building inside this community.</p></div><button class="linkButton" onclick="openPeopleListForCommunity('${id}')">View all →</button></div><div class="memberPreviewGrid">${
     (membersQ.data || [])
       .slice(0, 8)
       .map(
@@ -1143,40 +1341,38 @@ async function renderCommunityOverview(page, id) {
           `<button class="memberPreview" onclick="location.hash='user?id=${m.user?.id}'">${image(m.user?.avatar_url, m.user?.display_name || m.user?.username, "avatar large")}<b>${esc(m.user?.display_name || m.user?.username || "Developer")}</b><small>@${esc(m.user?.username || "")}</small></button>`,
       )
       .join("") || `<p class="muted">No members yet.</p>`
-  }</div></section><section class="overviewCard"><h2>Upcoming events</h2>${(eventsQ.data || []).map((e) => `<div class="resourceRow"><div class="resourceIcon">◷</div><div><b>${esc(e.title)}</b><small>${new Date(e.starts_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</small></div></div>`).join("") || `<p class="muted">No events scheduled yet.</p>`}</section></main><aside class="communityJoinRail"><section class="joinCard"><div class="joinCardTop"><span class="statusDot"></span><b>${joined ? "You're a member" : "Public community"}</b></div>${joined ? `<button class="primary full" onclick="location.hash='communityChat?id=${id}'">Open community</button>${!creator ? `<button class="secondary full" onclick="leaveCommunity('${id}')">Leave community</button>` : ""}` : applicationQ.data?.status === "pending" ? `<button class="secondary full" disabled>Application pending</button>` : `<button class="primary full" onclick="${c.recruitment_enabled ? `applyCommunity('${id}')` : `joinCommunity('${id}')`}">${c.recruitment_enabled ? "Apply to join" : "Join community"}</button>`}<div class="joinMeta"><span>✓ ${Number(c.member_count || 0).toLocaleString()} members</span><span>✓ ${esc(c.remote_mode || "Remote")}</span><span>✓ ${esc(c.category || "Developer community")}</span></div></section><section class="overviewCard compact"><h3>Community details</h3><div class="settingLine">◉ Public</div><div class="settingLine">♧ ${c.recruitment_enabled ? "Recruiting" : "No recruitment"}</div><div class="settingLine">⌖ ${esc(c.location || "Global")}</div><div class="settingLine">★ ${esc(c.category || "Community")}</div></section><section class="overviewCard compact"><h3>Recent resources</h3>${(filesQ.data || []).map((f) => `<a class="resourceRow" href="${esc(f.url)}" target="_blank" rel="noreferrer"><div class="resourceIcon">▣</div><div><b>${esc(f.name)}</b><small>${timeAgo(f.created_at)}</small></div></a>`).join("") || `<p class="muted">No resources yet.</p>`}</section></aside></div></div>`;
+  }</div></section><section class="overviewCard"><h2>Upcoming events</h2>${(eventsQ.data || []).map((e) => `<div class="resourceRow"><div class="resourceIcon">◷</div><div><b>${esc(e.title)}</b><small>${new Date(e.starts_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</small></div></div>`).join("") || `<p class="muted">No events scheduled yet.</p>`}</section></main><aside class="communityJoinRail"><section class="joinCard"><div class="joinCardTop"><span class="statusDot"></span><b>${joined ? "You're a member" : "Public community"}</b></div>${joined ? `<button class="primary full" onclick="location.hash='communityChat?id=${id}'">Open community</button>${!creator ? `<button class="secondary full" onclick="leaveCommunity('${id}')">Leave community</button>` : ""}` : applicationQ.data?.status === "pending" ? `<button class="secondary full" disabled>Application pending</button>` : (c.recruitment_mode || (!c.recruitment_enabled ? "closed" : "application")) === "open" ? `<button class="primary full" onclick="joinCommunity('${id}')">Join community</button>` : (c.recruitment_mode || (!c.recruitment_enabled ? "closed" : "application")) === "application" ? `<button class="primary full" onclick="applyCommunity('${id}')">Apply to join</button>` : `<button class="secondary full" disabled>Recruitment closed</button>`}<div class="joinMeta"><span>✓ ${Number(c.member_count || 0).toLocaleString()} members</span><span>✓ ${esc(c.remote_mode || "Remote")}</span><span>✓ ${esc(c.category || "Developer community")}</span></div></section><section class="overviewCard compact"><h3>Community details</h3><div class="settingLine">◉ Public</div><div class="settingLine">♧ ${esc(recruitmentLabel(c))}</div><div class="settingLine">⌖ ${esc(c.location || "Global")}</div><div class="settingLine">★ ${esc(c.category || "Community")}</div></section><section class="overviewCard compact"><h3>Recent resources</h3>${(filesQ.data || []).map((f) => `<a class="resourceRow" href="${esc(f.url)}" target="_blank" rel="noreferrer"><div class="resourceIcon">▣</div><div><b>${esc(f.name)}</b><small>${timeAgo(f.created_at)}</small></div></a>`).join("") || `<p class="muted">No resources yet.</p>`}</section></aside></div></div>`;
 }
 
 async function renderCommunityWorkspace(page, id) {
-  const membership = await supabase
-    .from("community_members")
-    .select("role")
-    .eq("community_id", id)
-    .eq("user_id", state.session.user.id)
-    .maybeSingle();
-  const basic = await supabase
-    .from("communities")
-    .select("creator_id")
-    .eq("id", id)
-    .single();
+  const [membership, basic, communityQ] = await Promise.all([
+    supabase
+      .from("community_members")
+      .select("role")
+      .eq("community_id", id)
+      .eq("user_id", state.session.user.id)
+      .maybeSingle(),
+    supabase.from("communities").select("creator_id").eq("id", id).single(),
+    supabase.from("communities").select("*").eq("id", id).single(),
+  ]);
   if (!membership.data && basic.data?.creator_id !== state.session.user.id)
     return renderCommunityOverview(page, id);
-  const { data: c, error } = await supabase
-    .from("communities")
-    .select("*")
-    .eq("id", id)
-    .single();
+  const { data: c, error } = communityQ;
   if (error || !c)
     return (page.innerHTML = empty(
       "Community not found",
       "This community is unavailable.",
     ));
-  await supabase.rpc("record_community_view", { community_id_input: id });
   if (c?.category) trackInterest("community_category", c.category);
-  if (c.creator_id === state.session.user.id)
-    await supabase.rpc("ensure_community_creator_membership", {
-      community_id_input: id,
-    });
-  const channels = await ensureCommunityChannels(id);
+  const [viewResult, creatorRepair, channels] = await Promise.all([
+    supabase.rpc("record_community_view", { community_id_input: id }),
+    c.creator_id === state.session.user.id
+      ? supabase.rpc("ensure_community_creator_membership", {
+          community_id_input: id,
+        })
+      : Promise.resolve({}),
+    ensureCommunityChannels(id),
+  ]);
   const [membersQ, membershipQ, applicationQ, eventsQ, filesQ] =
     await Promise.all([
       supabase
@@ -1242,7 +1438,7 @@ async function renderCommunityWorkspace(page, id) {
     )
     .eq("community_id", id)
     .order("created_at", { ascending: true })
-    .limit(200);
+    .limit(100);
   if (activeChannel?.id)
     messagesQ = messagesQ.eq("channel_id", activeChannel.id);
   const { data: messages, error: messagesError } = await messagesQ;
@@ -1274,7 +1470,7 @@ async function renderCommunityWorkspace(page, id) {
       <div class="workspaceHero" ${c.banner_url ? `style="background-image:linear-gradient(90deg,rgba(8,17,31,.72),rgba(8,17,31,.12)),url('${esc(c.banner_url)}')"` : ""}>
         ${image(c.logo_url, c.name, "workspaceCommunityLogo")}
         <div class="workspaceHeroText"><div class="eyebrow">${esc(c.category || "COMMUNITY")}</div><h1>${esc(c.name)} <span class="publicBadge">Public</span></h1><p>${esc(c.description || "Build together.")}</p><small>${c.member_count || 0} members · ${c.view_count || 0} views · Created ${timeAgo(c.created_at)} · ${esc(c.remote_mode || "Remote")}</small></div>
-        <div class="workspaceHeroActions">${creator ? `<button class="secondary" onclick="openCommunityModal('${id}')">Edit</button>` : joined ? `<button class="secondary" onclick="leaveCommunity('${id}')">Leave</button>` : applicationQ.data?.status === "pending" ? `<button class="secondary" disabled>Application pending</button>` : `<button class="primary" onclick="applyCommunity('${id}')">Apply to join</button>`}</div>
+        <div class="workspaceHeroActions">${creator ? `<button class="secondary" onclick="openCommunityModal('${id}')">Edit</button>` : joined ? `<button class="secondary" onclick="leaveCommunity('${id}')">Leave</button>` : applicationQ.data?.status === "pending" ? `<button class="secondary" disabled>Application pending</button>` : (c.recruitment_mode || (!c.recruitment_enabled ? "closed" : "application")) === "open" ? `<button class="primary" onclick="joinCommunity('${id}')">Join community</button>` : (c.recruitment_mode || (!c.recruitment_enabled ? "closed" : "application")) === "application" ? `<button class="primary" onclick="applyCommunity('${id}')">Apply to join</button>` : `<button class="secondary" disabled>Recruitment closed</button>`}</div>
       </div>
       <div class="workspaceTabs"><button class="workspaceTab active" data-tab="chat">▣ Chat</button></div>
     </div>
@@ -1304,7 +1500,7 @@ async function renderCommunityWorkspace(page, id) {
         <section class="rightCard"><h3>Community Settings</h3><div class="settingLine"><span>◉</span> Public Community</div><div class="settingLine"><span>♧</span> ${c.recruitment_enabled ? "Recruitment Enabled" : "Recruitment Closed"}</div><div class="settingLine"><span>◷</span> ${c.member_count || 0} Members</div><div class="settingLine"><span>⌖</span> ${esc(c.location || c.remote_mode || "Remote")}</div></section>
         <section class="rightCard"><div class="rightTitle"><h3>Upcoming Events</h3>${creator ? `<button class="linkButton" onclick="openCommunityEventModal('${id}')">+ Add</button>` : ""}</div>${(eventsQ.data || []).map((e) => `<div class="resourceRow"><div class="resourceIcon">◷</div><div><b>${esc(e.title)}</b><small>${new Date(e.starts_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</small></div></div>`).join("") || `<div class="sideMuted">No events scheduled.</div>`}</section>
         <section class="rightCard"><div class="rightTitle"><h3>Recent Files</h3>${joined ? `<button class="linkButton" onclick="openCommunityFileModal('${id}')">+ Add</button>` : ""}</div>${(filesQ.data || []).map((f) => `<a class="resourceRow" href="${esc(f.url)}" target="_blank" rel="noreferrer"><div class="resourceIcon">▣</div><div><b>${esc(f.name)}</b><small>${esc(f.uploader?.display_name || f.uploader?.username || "Member")} · ${timeAgo(f.created_at)}</small></div></a>`).join("") || `<div class="sideMuted">No shared files yet.</div>`}</section>
-        ${creator && c.recruitment_enabled ? `<section class="rightCard" id="communityApplications"><h3>Recruitment</h3><p class="sideMuted">Loading applications…</p></section>` : ""}
+        ${creator ? `<section class="rightCard" id="communityApplications"><h3>Recruitment applications</h3><p class="sideMuted">Loading pending applications…</p></section>` : ""}
       </aside>
     </div>
   </div>`;
@@ -1365,7 +1561,7 @@ async function renderCommunityWorkspace(page, id) {
     preview.classList.remove("hidden");
     preview.innerHTML = `<span>📎 ${esc(file.name)}</span><small>${Math.max(1, Math.ceil(file.size / 1024))} KB</small><button type="button" aria-label="Remove attachment" onclick="clearCommunityAttachmentPreview()">×</button>`;
   });
-  if (creator && c.recruitment_enabled) await loadCommunityApplications(id);
+  if (creator) await loadCommunityApplications(id);
 }
 
 async function communityDMRows(convs) {
@@ -1449,37 +1645,19 @@ window.leaveCommunity = async (id) => {
   if (error) toast(error.message, "error");
   else navigate(`community?id=${id}`);
 };
-window.applyCommunity = async (id) => {
-  const { error } = await supabase
-    .from("community_applications")
-    .insert({
-      community_id: id,
-      applicant_id: state.session.user.id,
-      answers: {},
-    });
-  if (error) toast(error.message, "error");
-  else {
-    toast("Application sent.", "success");
-    navigate(`community?id=${id}`);
-  }
-};
 
 async function loadCommunityApplications(communityId) {
   const root = document.querySelector("#communityApplications");
   if (!root) return;
-  const { data, error } = await supabase
-    .from("community_applications")
-    .select(
-      "id,status,answers,created_at,applicant:profiles!community_applications_applicant_id_fkey(id,username,display_name,full_name,avatar_url,location)",
-    )
-    .eq("community_id", communityId)
-    .eq("status", "pending")
-    .order("created_at", { ascending: false });
+  const { data, error } = await supabase.rpc(
+    "get_pending_community_applications",
+    { community_id_input: communityId },
+  );
   if (error) {
     root.innerHTML = `<h2>Recruitment applications</h2><p class="muted">${esc(error.message)}</p>`;
     return;
   }
-  root.innerHTML = `<div class="rightTitle"><h2>Recruitment applications</h2><span class="pendingCount">${data?.length || 0} pending</span></div>${(data || []).map((a) => `<div class="communityApplication">${personRow(a.applicant)}<small class="muted">Pending · ${timeAgo(a.created_at)}</small><div class="appActions"><button class="primary" onclick="reviewCommunityApplication('${a.id}','${communityId}','accepted')">Accept</button><button class="danger" onclick="reviewCommunityApplication('${a.id}','${communityId}','rejected')">Deny</button></div></div>`).join("") || `<p class="muted">No pending applications.</p>`}`;
+  root.innerHTML = `<div class="rightTitle"><h2>Recruitment applications</h2><span class="pendingCount">${data?.length || 0} pending</span></div><p class="sideMuted">Only applications awaiting a decision are shown here.</p>${(data || []).map((a) => `<div class="communityApplication">${personRow({ id: a.applicant_id, username: a.username, display_name: a.display_name, full_name: a.full_name, avatar_url: a.avatar_url, location: a.location })}<small class="muted">Pending · ${timeAgo(a.created_at)}</small><div class="appActions"><button class="primary" onclick="reviewCommunityApplication('${a.id}','${communityId}','accepted')">Accept</button><button class="danger" onclick="reviewCommunityApplication('${a.id}','${communityId}','rejected')">Deny</button></div></div>`).join("") || `<p class="muted">No pending applications right now.</p>`}`;
 }
 window.reviewCommunityApplication = async function (
   applicationId,
@@ -2407,15 +2585,20 @@ async function openCommunityModal(id = null) {
     <div class="logoPicker"><div id="communityLogoPreview">${image(c?.logo_url, c?.name || "Community", "communityLogoPreviewImg")}</div><div><label>Community logo<input name="logo" type="file" accept="image/png,image/jpeg,image/webp,image/gif"></label><small>PNG, JPG, WEBP or GIF · max 5 MB</small></div></div>
     <label>Name<input name="name" required maxlength="80" value="${esc(c?.name || "")}"></label>
     <label>Description<textarea name="description" required rows="4" maxlength="500">${esc(c?.description || "")}</textarea></label>
-    <div class="modalTwoCol"><label>Community type<select name="category"><option value="Startups & Founders" >Startups & Founders</option><option value="AI & Machine Learning" >AI & Machine Learning</option><option value="Web Development" selected>Web Development</option><option value="Mobile Development" >Mobile Development</option><option value="Data Science" >Data Science</option><option value="Cybersecurity" >Cybersecurity</option><option value="Cloud & DevOps" >Cloud & DevOps</option><option value="Game Development" >Game Development</option><option value="Blockchain & Web3" >Blockchain & Web3</option><option value="Open Source" >Open Source</option><option value="UI/UX & Design" >UI/UX & Design</option><option value="Programming Languages" >Programming Languages</option><option value="Career & Jobs" >Career & Jobs</option><option value="Freelancing" >Freelancing</option><option value="Robotics & IoT" >Robotics & IoT</option><option value="No-Code & Automation" >No-Code & Automation</option></select></label><label>Required skills<input name="skills" value="${esc((c?.required_skills || []).join(", "))}" placeholder="React, Python, founders"></label></div>
+    <div class="modalTwoCol"><label>Community type<select name="category">${["Startups & Founders", "AI & Machine Learning", "Web Development", "Mobile Development", "Data Science", "Cybersecurity", "Cloud & DevOps", "Game Development", "Blockchain & Web3", "Open Source", "UI/UX & Design", "Programming Languages", "Career & Jobs", "Freelancing", "Robotics & IoT", "No-Code & Automation", "Trading & Finance"].map((x) => `<option value="${esc(x)}" ${c?.category === x || (!c && x === "Web Development") ? "selected" : ""}>${esc(x)}</option>`).join("")}</select></label><label>Required skills<input name="skills" value="${esc((c?.required_skills || []).join(", "))}" placeholder="React, Python, founders"></label></div>
     <label>Rules<textarea name="rules" rows="4">${esc(c?.rules || "")}</textarea></label>
     <div class="modalTwoCol"><label>Location<input name="location" value="${esc(c?.location || "")}" placeholder="City, Country or Remote"></label><label>Remote mode<select name="remote"><option ${c?.remote_mode === "Remote" || !c ? "selected" : ""}>Remote</option><option ${c?.remote_mode === "Hybrid" ? "selected" : ""}>Hybrid</option><option ${c?.remote_mode === "Onsite" ? "selected" : ""}>Onsite</option></select></label></div>
-    <label class="checkLabel"><input type="checkbox" name="recruitment" ${c?.recruitment_enabled ? "checked" : ""}><span>Enable recruitment</span></label>
+    <label>Recruitment type<select name="recruitmentMode"><option value="open">Open — anyone can join instantly</option><option value="application">Application — head approves or denies</option><option value="closed">Closed — joining disabled</option></select></label>
     <button class="primary full" id="communitySaveBtn">${c ? "Save changes" : "Create community"}</button>
   </form>`);
   const form = document.querySelector("#communityForm");
   const categorySelect = form.querySelector('[name="category"]');
   if (categorySelect && c?.category) categorySelect.value = c.category;
+  const recruitmentModeSelect = form.querySelector('[name="recruitmentMode"]');
+  if (recruitmentModeSelect)
+    recruitmentModeSelect.value =
+      c?.recruitment_mode ||
+      (!c?.recruitment_enabled ? "closed" : "application");
   const fileInput = form.querySelector('[name="logo"]');
   fileInput.onchange = () => {
     const f = fileInput.files?.[0];
@@ -2443,7 +2626,10 @@ async function openCommunityModal(id = null) {
           .filter(Boolean),
         rules: String(f.get("rules") || "").trim(),
         remote: String(f.get("remote") || "Remote"),
-        recruitment: f.has("recruitment"),
+        recruitmentMode: String(f.get("recruitmentMode") || "closed"),
+        recruitment: ["open", "application"].includes(
+          String(f.get("recruitmentMode") || ""),
+        ),
         location: String(f.get("location") || "").trim(),
       };
       if (!base.name || !base.description)
@@ -2460,6 +2646,7 @@ async function openCommunityModal(id = null) {
           recruitment_input: base.recruitment,
           location_input: base.location,
           logo_url_input: null,
+          recruitment_mode_input: base.recruitmentMode,
         });
         if (r.error) throw r.error;
         communityId = r.data;
@@ -2484,8 +2671,11 @@ async function openCommunityModal(id = null) {
         recruitment_input: base.recruitment,
         location_input: base.location,
         logo_url_input: logoUrl,
+        recruitment_mode_input: base.recruitmentMode,
       });
       if (r.error) throw r.error;
+      state.cache.communities.at = 0;
+      state.cache.search.clear();
       closeModal();
       toast(c ? "Community updated." : "Community created.", "success");
       navigate(`community?id=${communityId}`);

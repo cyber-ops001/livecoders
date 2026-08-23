@@ -1,0 +1,452 @@
+import { supabase } from "./supabaseClient.js";
+
+const state = {
+  session: null,
+  profile: null,
+  route: "home",
+  selectedConversation: null,
+  notifications: [],
+  searchTimer: null,
+  realtime: null,
+  selectedCommunityChannel: null
+};
+
+const app = document.querySelector("#app");
+const esc = (v = "") => String(v).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]));
+const initials = (name = "?") => String(name).trim().split(/\s+/).slice(0,2).map(x => x[0]).join("").toUpperCase() || "?";
+const timeAgo = v => v ? new Date(v).toLocaleString([], { dateStyle:"medium", timeStyle:"short" }) : "";
+const image = (url, name, cls="avatar") => url ? `<img class="${cls}" src="${esc(url)}" alt="${esc(name || "Profile picture")}">` : `<div class="${cls}">${esc(initials(name))}</div>`;
+const empty = (title, text) => `<div class="emptyState"><div class="emptyIcon">&gt;_</div><h2>${esc(title)}</h2><p>${esc(text)}</p></div>`;
+
+function toast(message, type="info") {
+  const root = document.querySelector("#toastRoot"); const el = document.createElement("div");
+  el.className = `toast ${type}`; el.textContent = message; root.appendChild(el); setTimeout(() => el.remove(), 3200);
+}
+
+async function profile(id = state.session?.user?.id) {
+  if (!id) return null;
+  const { data, error } = await supabase.from("profiles").select("*").eq("id", id).maybeSingle();
+  if (error) console.error(error); if (id === state.session?.user?.id) state.profile = data; return data;
+}
+
+async function bootstrap() {
+  const { data: { session } } = await supabase.auth.getSession(); state.session = session;
+  if (!session) return renderAuth();
+  await profile(); await loadNotifications(); renderShell(); await navigate(location.hash.slice(1) || "home"); subscribeRealtime();
+}
+
+supabase.auth.onAuthStateChange(async (_event, session) => {
+  state.session = session;
+  if (session) { await profile(); await loadNotifications(); renderShell(); await navigate(location.hash.slice(1) || "home"); subscribeRealtime(); }
+  else { state.profile = null; renderAuth(); }
+});
+
+function renderAuth() {
+  app.innerHTML = `<main class="authPage"><section class="authHero"><img class="authLogo" src="assets/live-coders-logo.svg" alt="Live Coders logo"><div class="eyebrow">DEVELOPER NETWORK</div><h1>Live Coders</h1><p>Build. Get stuck. Ask. Connect. Solve.</p><div class="codeLine"><span>const</span> community = <b>"builders"</b>;</div></section><section class="authCard"><div class="tabs"><button class="tab active" data-auth="login">Login</button><button class="tab" data-auth="signup">Sign up</button></div><form id="authForm"><div id="signupFields" class="hidden"><label>Full name<input name="fullName" autocomplete="name"></label><label>Username<input name="username" autocomplete="username"></label></div><label>Email<input name="email" type="email" required autocomplete="email"></label><label>Password<input name="password" type="password" required minlength="6"></label><div id="confirmField" class="hidden"><label>Confirm password<input name="confirmPassword" type="password" minlength="6"></label></div><button class="primary full" id="authSubmit">Login</button><button class="linkButton" type="button" id="forgotBtn">Forgot password?</button></form></section></main>`;
+  let mode = "login";
+  document.querySelectorAll("[data-auth]").forEach(btn => btn.onclick = () => { mode = btn.dataset.auth; document.querySelectorAll("[data-auth]").forEach(x => x.classList.toggle("active", x === btn)); document.querySelector("#signupFields").classList.toggle("hidden", mode !== "signup"); document.querySelector("#confirmField").classList.toggle("hidden", mode !== "signup"); document.querySelector("#authSubmit").textContent = mode === "signup" ? "Create account" : "Login"; document.querySelector("#forgotBtn").classList.toggle("hidden", mode === "signup"); });
+  document.querySelector("#authForm").onsubmit = async e => { e.preventDefault(); const f = new FormData(e.target); try { if (mode === "signup") { if (f.get("password") !== f.get("confirmPassword")) throw new Error("Passwords do not match."); const fullName = String(f.get("fullName")||"").trim().replace(/\s+/g," "); const username = String(f.get("username")||"").trim().toLowerCase(); if (!fullName || fullName.length < 2) throw new Error("Enter your full name."); if (!/^[a-z0-9_]{3,30}$/.test(username)) throw new Error("Username must be 3–30 characters."); const { data: takenUsername, error: usernameError } = await supabase.from("profiles").select("id").eq("username", username).maybeSingle(); if (usernameError) throw usernameError; if (takenUsername) throw new Error("Username already taken."); const { data: takenName, error: nameError } = await supabase.from("profiles").select("id").ilike("display_name", fullName).maybeSingle(); if (nameError) throw nameError; if (takenName) throw new Error("That name is already in use. Please choose another name."); const redirectTo = location.origin && location.origin !== "null" ? `${location.origin}/` : "http://localhost:5500/"; const { data, error } = await supabase.auth.signUp({ email:f.get("email"), password:f.get("password"), options:{data:{fullName,username},emailRedirectTo:redirectTo} }); if (error) throw error; if (data.session) { toast("Account created. Welcome to Live Coders!","success"); return; } document.querySelector("#authSubmit").textContent = "Account created"; toast("Account created. Check your email to verify it, then return here to log in.","success"); } else { const { error } = await supabase.auth.signInWithPassword({email:f.get("email"),password:f.get("password")}); if (error) throw error; } } catch(err) { toast(err.message,"error"); } };
+  document.querySelector("#forgotBtn").onclick = async () => { const email = document.querySelector('input[name="email"]').value.trim(); if (!email) return toast("Enter your email first.","error"); const { error } = await supabase.auth.resetPasswordForEmail(email,{redirectTo:location.origin}); toast(error?.message || "Password reset email sent.", error ? "error":"success"); };
+}
+
+function navItem(route, icon, label, badge=0) { return `<a href="#${route}" data-route="${route}"><span>${icon}</span>${label}${badge ? `<b class="navBadge">${badge}</b>` : ""}</a>`; }
+
+function renderShell() {
+  app.innerHTML = `<div class="layout"><aside class="sidebar"><div class="brand" onclick="location.hash='home'"><img class="brandLogo" src="assets/live-coders-logo.svg" alt=""><div class="brandText"><strong>Live Coders</strong><small>Build • Ask • Connect</small></div></div><nav>${navItem("home","⌂","Home")}${navItem("explore","⌕","Explore")}${navItem("communities","◈","Communities")}${navItem("myCommunities","▣","My Communities")}${navItem("messages","✉","Messages")}${navItem("notifications","●","Notifications",unreadNotificationCount())}${navItem("profile","◎","Profile")}${navItem("settings","⚙","Settings")}</nav><div class="sidebarBottom"><button class="profileMini" onclick="location.hash='profile'">${image(state.profile?.avatar_url,state.profile?.display_name||state.profile?.full_name||state.profile?.username)}<div><strong>${esc(state.profile?.display_name||state.profile?.full_name||"Developer")}</strong><small>@${esc(state.profile?.username||"")}</small></div></button><button class="ghost full" id="logoutBtn">Log out</button></div></aside><div class="mainArea"><header class="topbar"><div class="mobileBrand"><img class="brandLogo small" src="assets/live-coders-logo.svg" alt=""><strong>Live Coders</strong></div><div class="globalSearch"><span>⌕</span><input id="globalSearch" value="${esc(new URLSearchParams(location.hash.split("?")[1]||"").get("q")||"")}" placeholder="Search developers, posts, communities…"></div><div class="topActions"><button class="iconBtn" onclick="location.hash='notifications'">●<b id="notifBadge" class="${unreadNotificationCount()?"":"hidden"}">${unreadNotificationCount()}</b></button><button class="primary" onclick="openPostModal()">+ Create Post</button></div></header><main id="page"></main></div></div>`;
+  document.querySelector("#logoutBtn").onclick = () => supabase.auth.signOut();
+  const search = document.querySelector("#globalSearch");
+  search.oninput = () => { clearTimeout(state.searchTimer); const q = search.value.trim(); state.searchTimer = setTimeout(() => { location.hash = q ? `explore?q=${encodeURIComponent(q)}` : "explore"; }, 90); };
+}
+
+async function navigate(raw) {
+  const [route] = raw.split("?"); state.route = route || "home"; const page = document.querySelector("#page"); if (!page) return;
+  document.querySelectorAll("[data-route]").forEach(a => a.classList.toggle("active", a.dataset.route === state.route));
+  const query = new URLSearchParams(raw.split("?")[1]||"");
+  try {
+    if (state.route === "home") await renderHome(page);
+    else if (state.route === "explore") await renderExplore(page,query.get("q")||"");
+    else if (state.route === "communities") await renderCommunities(page);
+    else if (state.route === "myCommunities") await renderMyCommunities(page);
+    else if (state.route === "messages") { state.selectedConversation = query.get("conversation"); await renderMessages(page); }
+    else if (state.route === "notifications") await renderNotifications(page);
+    else if (state.route === "profile") await renderProfile(page,state.session.user.id);
+    else if (state.route === "user") await renderProfile(page,query.get("id"));
+    else if (state.route === "community") await renderCommunity(page,query.get("id"));
+    else if (state.route === "settings") await renderSettings(page);
+    else await renderHome(page);
+  } catch (e) { console.error(e); page.innerHTML = `<div class="errorState"><h2>Something went wrong</h2><p>${esc(e.message)}</p></div>`; }
+}
+window.addEventListener("hashchange",()=>navigate(location.hash.slice(1)));
+
+async function getPosts(filter={}) {
+  let q = supabase.from("posts").select("*,author:profiles!posts_author_id_fkey(id,username,display_name,full_name,avatar_url)").order("created_at",{ascending:false}).limit(50);
+  if (filter.author) q = q.eq("author_id",filter.author);
+  const {data,error}=await q; if(error) throw error; return data||[];
+}
+
+async function postCard(p) {
+  const {data: liked}=await supabase.from("post_likes").select("post_id").eq("post_id",p.id).eq("user_id",state.session.user.id).maybeSingle();
+  const author=p.author||{}; return `<article class="postCard"><div class="postAuthor" onclick="location.hash='user?id=${p.author_id}'">${image(author.avatar_url,author.display_name||author.full_name||author.username)}<div><strong>${esc(author.display_name||author.full_name||author.username||"Developer")}</strong><small>@${esc(author.username||"")} · ${timeAgo(p.created_at)}</small></div><span class="statusPill ${String(p.status||"").toLowerCase().replaceAll(" ","-")}">${esc(p.status||"Open")}</span></div><h2>${esc(p.title)}</h2><p class="postContent">${esc(p.content)}</p><div class="tags">${(p.tags||[]).map(t=>`<span class="tag">#${esc(t)}</span>`).join("")}</div><div class="postMeta"><button onclick="toggleLike('${p.id}',${!!liked})">${liked?"♥":"♡"} ${p.like_count||0}</button><button onclick="openComments('${p.id}')">💬 ${p.comment_count||0}</button><button onclick="viewPost('${p.id}')">👁 ${p.view_count||0}</button><button onclick="location.hash='user?id=${p.author_id}'">Profile</button></div></article>`;
+}
+
+async function renderHome(page) {
+  page.innerHTML=`<div class="pageHead"><div><div class="eyebrow">YOUR BUILDER FEED</div><h1>What are you building?</h1><p>Find problems to solve, people to collaborate with, and communities to join.</p></div><button class="primary" onclick="openPostModal()">+ Create Post</button></div><div class="feedLayout"><section id="feedList">Loading posts…</section><aside class="rightRail"><div class="card"><h3>Quick actions</h3><button class="railAction" onclick="openPostModal()">+ Share a problem</button><button class="railAction" onclick="location.hash='explore'">⌕ Explore developers</button><button class="railAction" onclick="location.hash='communities'">◈ Find communities</button></div></aside></div>`;
+  const posts=await getPosts(); const list=document.querySelector("#feedList"); list.innerHTML=posts.length ? (await Promise.all(posts.map(postCard))).join("") : empty("No posts yet","Be the first developer to publish something.");
+}
+
+async function toggleLike(postId,liked){
+  const post=await supabase.from("posts").select("author_id,title").eq("id",postId).single(); if(post.error) return toast(post.error.message,"error");
+  const res=liked ? await supabase.from("post_likes").delete().eq("post_id",postId).eq("user_id",state.session.user.id) : await supabase.from("post_likes").insert({post_id:postId,user_id:state.session.user.id});
+  if(res.error) toast(res.error.message,"error"); else { if(state.route==="home") navigate("home"); else if(state.route==="user") navigate(location.hash.slice(1)); }
+}
+window.toggleLike=toggleLike;
+
+async function openComments(postId){
+  const {data:comments,error}=await supabase.from("post_comments").select("*,author:profiles!post_comments_author_id_fkey(id,username,display_name,full_name,avatar_url)").eq("post_id",postId).order("created_at",{ascending:true});
+  if(error) return toast(error.message,"error");
+  const {data:likes}=await supabase.from("comment_likes").select("comment_id").in("comment_id",(comments||[]).map(c=>c.id).filter(Boolean)).eq("user_id",state.session.user.id);
+  const likedSet=new Set((likes||[]).map(x=>x.comment_id));
+  const byParent={}; (comments||[]).forEach(c=>{(byParent[c.parent_id||"root"] ||= []).push(c);});
+  const renderComment=(c,depth=0)=>{const replies=byParent[c.id]||[];return `<div class="comment ${depth?'replyComment':''}" style="margin-left:${Math.min(depth,3)*24}px"><button class="commentAuthor" onclick="closeModal();location.hash='user?id=${c.author_id}'">${image(c.author?.avatar_url,c.author?.display_name||c.author?.full_name||c.author?.username,"avatar small")}<span><b>${esc(c.author?.display_name||c.author?.full_name||c.author?.username)}</b><small>@${esc(c.author?.username||"")} · ${timeAgo(c.created_at)}</small></span></button><p>${esc(c.content)}</p><div class="commentActions"><button onclick="toggleCommentLike('${c.id}',${likedSet.has(c.id)},'${postId}')">${likedSet.has(c.id)?"♥":"♡"} ${c.like_count||0}</button><button onclick="replyToComment('${c.id}')">↩ Reply</button></div>${replies.map(r=>renderComment(r,depth+1)).join("")}</div>`;};
+  modal(`<h2>Comments</h2><div class="commentList">${(byParent.root||[]).map(c=>renderComment(c)).join("")||`<p class="muted">No comments yet.</p>`}</div><form id="commentForm"><label>Add a comment<textarea name="content" rows="3" required></textarea></label><input type="hidden" name="parentId"><button class="primary full">Comment</button></form>`);
+  document.querySelector("#commentForm").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);const content=String(f.get("content")).trim();const parentId=f.get("parentId")||null;const {error}=await supabase.from("post_comments").insert({post_id:postId,author_id:state.session.user.id,parent_id:parentId,content});if(error)toast(error.message,"error");else{closeModal();toast(parentId?"Reply added.":"Comment added.","success");await openComments(postId);}};
+}
+async function toggleCommentLike(commentId,liked,postId){const res=liked?await supabase.from("comment_likes").delete().eq("comment_id",commentId).eq("user_id",state.session.user.id):await supabase.from("comment_likes").insert({comment_id:commentId,user_id:state.session.user.id});if(res.error)toast(res.error.message,"error");else openComments(postId);}
+window.toggleCommentLike=toggleCommentLike;
+function replyToComment(commentId){const input=document.querySelector('#commentForm input[name="parentId"]');if(input)input.value=commentId;document.querySelector('#commentForm textarea')?.focus();}
+window.replyToComment=replyToComment;
+window.openComments=openComments;
+async function viewPost(id){ await supabase.rpc("record_post_view",{post_id_input:id}); }
+window.viewPost=viewPost;
+
+async function renderExplore(page,q=""){
+  const like=q ? `%${q.replaceAll("%","\\%").replaceAll("_","\\_")}%` : null;
+  const [users,posts,communities]=await Promise.all([
+    q ? supabase.from("profiles").select("id,username,display_name,full_name,avatar_url,bio,skills,location").or(`username.ilike.${like},display_name.ilike.${like},full_name.ilike.${like},bio.ilike.${like},location.ilike.${like}`).limit(30) : Promise.resolve({data:[],error:null}),
+    q ? supabase.from("posts").select("*,author:profiles!posts_author_id_fkey(id,username,display_name,full_name,avatar_url,location)").or(`title.ilike.${like},content.ilike.${like}`).order("created_at",{ascending:false}).limit(30) : Promise.resolve({data:[],error:null}),
+    supabase.from("communities").select("*").order("member_count",{ascending:false}).limit(24)
+  ]);
+  if(users.error||posts.error||communities.error) return page.innerHTML=empty("Search error",users.error?.message||posts.error?.message||communities.error?.message||"Try again in a moment.");
+  const allCommunities=communities.data||[];
+  const categories=[...new Set(allCommunities.map(c=>c.category).filter(Boolean))].slice(0,7);
+  const filtered=q ? allCommunities.filter(c=>[c.name,c.description,c.category,c.location].some(v=>String(v||"").toLowerCase().includes(q.toLowerCase()))) : allCommunities;
+  const popular=filtered.slice(0,4);
+  const trending=[...filtered].sort((a,b)=>(Number(b.view_count||0)+Number(b.member_count||0))-(Number(a.view_count||0)+Number(a.member_count||0))).slice(0,6);
+  page.innerHTML=`
+    <div class="pageHead modernPageHead">
+      <div><div class="eyebrow">DISCOVER</div><h1>Explore Communities</h1><p>Discover and join communities that match your interests, technologies and goals.</p></div>
+      <button class="primary" onclick="openCommunityModal()">+ Create Community</button>
+    </div>
+    <div class="searchBox modernSearch"><span>⌕</span><input id="communitySearch" value="${esc(q)}" placeholder="Search communities..."><select id="communityCategory"><option value="">All Categories</option>${categories.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join("")}</select></div>
+    <div class="communityChips"><button class="chip active" data-category="">All</button>${categories.map(c=>`<button class="chip" data-category="${esc(c)}">${esc(c)}</button>`).join("")}</div>
+    <div class="exploreSection communityExplore">
+      <section><div class="sectionTitle"><div><h2>Popular Communities</h2><p class="muted">Communities developers are joining and exploring.</p></div><button class="linkButton" onclick="location.hash='communities'">View all →</button></div><div class="communityGrid" id="popularCommunities">${popular.map(c=>communityCard(c)).join("")||empty("No communities","Create the first one.")}</div></section>
+      ${q?`<section id="searchResults"><div class="sectionTitle"><div><h2>Search Results</h2><p class="muted">Results for “${esc(q)}”.</p></div></div><div class="userGrid">${(users.data||[]).map(u=>`<article class="userCard">${image(u.avatar_url,u.display_name||u.full_name||u.username,"avatar large")}<h3>${esc(u.display_name||u.full_name||u.username)}</h3><p>@${esc(u.username)}</p><p>${esc(u.bio||"Developer and builder.")}</p><button class="secondary full" onclick="location.hash='user?id=${u.id}'">View profile</button></article>`).join("")||empty("No developers","Try another search.")}</div></section>`:""}
+      <section><div class="sectionTitle"><div><h2>Trending Communities</h2><p class="muted">Active communities worth checking out.</p></div></div><div class="trendingCommunityList">${trending.map(c=>`<div class="trendingCommunityRow">${image(c.logo_url,c.name,"communityIcon small")}<div><b>${esc(c.name)}</b><small>${esc(c.category||"Community")} · ${c.member_count||0} members</small><p>${esc(c.description||"A developer community.")}</p></div><div class="trendMetric">↗ ${Number(c.view_count||0)}<small>views</small></div><button class="primary" onclick="location.hash='community?id=${c.id}'">Join</button></div>`).join("")||empty("No trends yet","Create a community and start growing.")}</div></section>
+    </div>`;
+  const search=document.querySelector("#communitySearch");
+  const category=document.querySelector("#communityCategory");
+  const chips=[...document.querySelectorAll(".chip")];
+  const apply=()=>{
+    const term=search?.value.trim().toLowerCase()||""; const cat=category?.value||"";
+    const list=allCommunities.filter(c=>{const hay=`${c.name||""} ${c.description||""} ${c.category||""} ${c.location||""}`.toLowerCase();return (!term||hay.includes(term))&&(!cat||c.category===cat);});
+    document.querySelector("#popularCommunities").innerHTML=list.slice(0,4).map(c=>communityCard(c)).join("")||empty("No matches","Try a different search or category.");
+    chips.forEach(b=>b.classList.toggle("active",b.dataset.category===cat));
+  };
+  search?.addEventListener("input",()=>{clearTimeout(state.searchTimer);state.searchTimer=setTimeout(apply,120)});
+  category?.addEventListener("change",apply);
+  chips.forEach(b=>b.onclick=()=>{category.value=b.dataset.category;apply()});
+}
+function communityCard(c){return `<article class="communityCard">${image(c.logo_url,c.name,"communityIcon")}<h3>${esc(c.name)}</h3><p>${esc(c.description||"Connect, share knowledge and build together.")}</p><small>${esc(c.category||"Community")} · ${Number(c.member_count||0).toLocaleString()} members</small><button class="primary full" onclick="location.hash='community?id=${c.id}'">Join Community</button></article>`;}
+
+async function renderCommunities(page){
+  const {data,error}=await supabase.from("communities").select("*").order("member_count",{ascending:false});
+  if(error) throw error;
+  const categories=[...new Set((data||[]).map(c=>c.category).filter(Boolean))];
+  page.innerHTML=`<div class="pageHead modernPageHead"><div><div class="eyebrow">COMMUNITY NETWORK</div><h1>Find your people.</h1><p>Join communities, share knowledge, collaborate and grow with developers.</p></div><button class="primary" onclick="openCommunityModal()">+ Create Community</button></div><div class="communityExplore"><div class="searchBox"><span>⌕</span><input id="allCommunitySearch" placeholder="Search communities..."><select id="allCommunityCategory"><option value="">All Categories</option>${categories.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join("")}</select></div><div class="communityChips"><button class="chip active" data-category="">All</button>${categories.map(c=>`<button class="chip" data-category="${esc(c)}">${esc(c)}</button>`).join("")}</div><div class="communityGrid pageGrid" id="allCommunitiesGrid">${(data||[]).map(communityCard).join("")||empty("No communities","Create the first one.")}</div></div>`;
+  const input=document.querySelector("#allCommunitySearch"),select=document.querySelector("#allCommunityCategory"),chips=[...document.querySelectorAll(".chip")];
+  const apply=()=>{const term=input.value.trim().toLowerCase(),cat=select.value;const rows=(data||[]).filter(c=>{const hay=`${c.name||""} ${c.description||""} ${c.category||""}`.toLowerCase();return (!term||hay.includes(term))&&(!cat||c.category===cat)});document.querySelector("#allCommunitiesGrid").innerHTML=rows.map(communityCard).join("")||empty("No matches","Try another search.");chips.forEach(b=>b.classList.toggle("active",b.dataset.category===cat));};
+  input.oninput=apply;select.onchange=apply;chips.forEach(b=>b.onclick=()=>{select.value=b.dataset.category;apply()});
+}
+
+async function renderMyCommunities(page){
+  const [membersQ,createdQ]=await Promise.all([
+    supabase.from("community_members").select("community_id,community:communities(*)").eq("user_id",state.session.user.id),
+    supabase.from("communities").select("*").eq("creator_id",state.session.user.id)
+  ]);
+  if(membersQ.error||createdQ.error) throw (membersQ.error||createdQ.error);
+  const map=new Map();
+  (membersQ.data||[]).forEach(x=>{if(x.community)map.set(x.community.id,x.community);});
+  (createdQ.data||[]).forEach(c=>map.set(c.id,c));
+  const communities=[...map.values()].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  page.innerHTML=`<div class="pageHead modernPageHead"><div><div class="eyebrow">MY COMMUNITIES</div><h1>Your workspace</h1><p>Everything you joined or built, in one place.</p></div><button class="primary" onclick="openCommunityModal()">+ Create Community</button></div><div class="myCommunityGrid">${communities.map(c=>`<article class="myCommunityCard" onclick="location.hash='community?id=${c.id}'"><div class="myCommunityCover" style="${c.banner_url?`background-image:url('${esc(c.banner_url)}')`:''}"></div><div class="myCommunityBody">${image(c.logo_url,c.name,"communityIcon") }<div class="myCommunityInfo"><h3>${esc(c.name)}</h3><p>${esc(c.description||"Build together.")}</p><div class="communityMiniMeta"><span>${c.member_count||0} members</span><span>${c.view_count||0} views</span><span>${esc(c.remote_mode||"Remote")}</span></div></div></div></article>`).join("")||empty("No communities yet","Join a community from Explore or create your own.")}</div>`;
+}
+async function renderProfile(page,id){
+  if(!id) return page.innerHTML=empty("Profile not found","No user was selected.");
+  const p=await profile(id); if(!p) return page.innerHTML=empty("Profile not found","This developer does not exist.");
+  const results=await Promise.all([
+    supabase.from("follows").select("following_id",{count:"exact",head:true}).eq("following_id",id),
+    supabase.from("follows").select("follower_id",{count:"exact",head:true}).eq("follower_id",id),
+    supabase.from("posts").select("id",{count:"exact",head:true}).eq("author_id",id),
+    supabase.from("follows").select("follower_id,user:profiles!follows_follower_id_fkey(id,username,display_name,full_name,avatar_url)").eq("following_id",id).limit(100),
+    supabase.from("follows").select("following_id,user:profiles!follows_following_id_fkey(id,username,display_name,full_name,avatar_url)").eq("follower_id",id).limit(100),
+    supabase.from("projects").select("*,community:communities(id,name,logo_url)").eq("owner_id",id).order("created_at",{ascending:false}),
+    supabase.from("community_members").select("community:communities(id,name,logo_url,description)").eq("user_id",id),
+    getPosts({author:id})
+  ]);
+  const [followersQ,followingQ,postsQ,followerRows,followingRows,projects,memberRows,posts]=results;
+  const firstError=[followersQ,followingQ,postsQ,followerRows,followingRows,projects,memberRows].find(r=>r?.error)?.error;
+  if(firstError) return page.innerHTML=empty("Profile unavailable",firstError.message);
+  const followers=followersQ.count||0, following=followingQ.count||0, postCount=postsQ.count||0;
+  const own=id===state.session.user.id;
+  let isFollowing=false;
+  if(!own){const {data}=await supabase.from("follows").select("follower_id").eq("follower_id",state.session.user.id).eq("following_id",id).maybeSingle();isFollowing=!!data;}
+  page.innerHTML=`<section class="profileHeader"><div class="profileAvatarWrap">${image(p.avatar_url,p.display_name||p.full_name||p.username,"profileAvatar")}</div><div class="profileIdentity"><div class="eyebrow">@${esc(p.username)}</div><h1>${esc(p.display_name||p.full_name||"Developer")}</h1><p>${esc(p.bio||"Building things and solving problems.")}</p>${p.location?`<div class="profileLocation">⌖ ${esc(p.location)}</div>`:""}<div class="profileStats"><button onclick="openPeopleList('${id}','followers')"><b>${followers}</b><span>followers</span></button><button onclick="openPeopleList('${id}','following')"><b>${following}</b><span>following</span></button><span><b>${postCount}</b><span>posts</span></span></div></div><div class="profileActions">${own?`<button class="primary" onclick="openProfileModal()">Edit profile</button>`:`<button class="${isFollowing?"secondary":"primary"}" onclick="toggleFollow('${id}',${isFollowing})">${isFollowing?"Unfollow":"Follow"}</button><button class="secondary" onclick="messageUser('${id}')">Message</button>`}</div></section><div class="profileGrid"><section><div class="card"><h2>About</h2><p>${esc(p.bio||"No bio yet.")}</p>${p.location?`<p class="profileLocation">⌖ ${esc(p.location)}</p>`:""}<h3>Skills</h3><div class="tags">${(p.skills||[]).map(s=>`<span class="tag">${esc(s)}</span>`).join("")||"<span class='muted'>No skills listed.</span>"}</div></div><div class="card"><div class="sectionTitle"><h2>Projects</h2>${own?`<button class="secondary" onclick="openProjectModal()">+ Add project</button>`:""}</div><div class="projectList">${(projects.data||[]).map(projectCard).join("")||`<p class="muted">${own?"Add your projects here.":"No projects added yet."}</p>`}</div></div><div class="card"><h2>Posts</h2><div class="profilePosts">${(await Promise.all((posts||[]).map(postCard))).join("")||empty("No posts yet","This developer has not posted anything.")}</div></div></section><aside><div class="card"><h3>Following (${following})</h3><div class="peopleList">${(followingRows.data||[]).slice(0,12).map(row=>personRow(row.user)).join("")||`<p class="muted">Not following anyone yet.</p>`}</div>${following>12?`<button class="linkButton" onclick="openPeopleList('${id}','following')">See all following</button>`:""}</div><div class="card"><h3>Followers (${followers})</h3><div class="peopleList">${(followerRows.data||[]).slice(0,12).map(row=>personRow(row.user)).join("")||`<p class="muted">No followers yet.</p>`}</div>${followers>12?`<button class="linkButton" onclick="openPeopleList('${id}','followers')">See all followers</button>`:""}</div><div class="card"><h3>Communities & projects</h3><div class="peopleList">${(memberRows.data||[]).map(x=>x.community?`<button class="memberRow" onclick="location.hash='community?id=${x.community.id}'">${image(x.community.logo_url,x.community.name,"avatar")}<span><b>${esc(x.community.name)}</b><small>Joined community</small></span></button>`:" ").join("")||`<p class="muted">No community links yet.</p>`}</div></div><div class="card"><h3>Links</h3>${linkLine("GitHub",p.github_url)}${linkLine("LinkedIn",p.linkedin_url)}${linkLine("Portfolio",p.portfolio_url)}${linkLine("Website",p.website_url)}</div></aside></div>`;
+}
+function personRow(u){return u?`<button class="memberRow" onclick="location.hash='user?id=${u.id}'">${image(u.avatar_url,u.display_name||u.full_name||u.username)}<span><b>${esc(u.display_name||u.full_name||u.username)}</b><small>@${esc(u.username)}</small></span></button>`:"";}
+function projectCard(x){return `<div class="projectCard"><div><h3>${esc(x.name)}</h3><p>${esc(x.description||"")}</p><div class="tags">${(x.technologies||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>${x.community?`<button class="communityLink" onclick="location.hash='community?id=${x.community.id}'">${esc(x.community.name)}</button>`:""}</div>${x.url?`<a target="_blank" rel="noreferrer" href="${esc(x.url)}">Open</a>`:""}</div>`;}
+function linkLine(label,url){return url?`<a class="linkLine" target="_blank" rel="noreferrer" href="${esc(url)}">${esc(label)} ↗</a>`:"";}
+
+async function openPeopleList(userId,type){const col=type==="followers"?"follower_id":"following_id", match=type==="followers"?"following_id":"follower_id"; const {data}=await supabase.from("follows").select(`${col},user:profiles!follows_${col}_fkey(id,username,display_name,full_name,avatar_url)`).eq(match,userId).order("created_at",{ascending:false}); modal(`<h2>${type==="followers"?"Followers":"Following"}</h2><div class="peopleList">${(data||[]).map(x=>personRow(x.user)).join("")||`<p class="muted">No ${type} yet.</p>`}</div>`);}
+window.openPeopleList=openPeopleList;
+
+async function toggleFollow(id,following){const action=following?supabase.from("follows").delete().eq("follower_id",state.session.user.id).eq("following_id",id):supabase.from("follows").insert({follower_id:state.session.user.id,following_id:id}); const {error}=await action; if(error) toast(error.message,"error"); else { toast(following?"Unfollowed.":"Following.","success"); navigate(`user?id=${id}`); }}
+window.toggleFollow=toggleFollow;
+
+async function messageUser(otherId){if(otherId===state.session.user.id) return toast("You cannot message yourself.","error"); const {data,error}=await supabase.rpc("get_or_create_direct_conversation",{other_user_id:otherId}); if(error) return toast(error.message,"error"); location.hash=`messages?conversation=${data}`;}
+window.messageUser=messageUser;
+
+async function refreshCommunityChat(id,channelId=state.selectedCommunityChannel){
+  let query=supabase.from("community_messages").select("*,sender:profiles!community_messages_sender_id_fkey(username,display_name,full_name,avatar_url)").eq("community_id",id).order("created_at",{ascending:true}).limit(200);
+  if(channelId)query=query.eq("channel_id",channelId);
+  const {data,error}=await query;
+  if(error){toast(error.message,"error");return;}
+  const chat=document.querySelector("#communityChat");if(!chat)return;
+  chat.innerHTML=(data||[]).map(m=>{const own=m.sender_id===state.session.user.id,deleted=!!m.deleted_at;const attachment=m.attachment_url?`<a class="messageAttachment" href="${esc(m.attachment_url)}" target="_blank" rel="noreferrer">📎 ${esc(m.attachment_name||"Attachment")}</a>`:"";const voice=m.voice_url?`<audio class="voicePlayer" controls src="${esc(m.voice_url)}"></audio>${m.voice_duration_seconds?`<small class="voiceDuration">${m.voice_duration_seconds}s</small>`:""}`:"";const body=deleted?`<span class="messageDeleted">Message unsent</span>`:`${m.content?`<div>${esc(m.content)}</div>`:""}${attachment}${voice}`;return `<div class="workspaceMessage ${own?"mine":""}">${image(m.sender?.avatar_url,m.sender?.display_name||m.sender?.username,"avatar tiny")}<div class="workspaceMessageBody"><div class="workspaceMessageMeta"><b>${esc(m.sender?.display_name||m.sender?.username)}</b><small>${timeAgo(m.created_at)}</small>${own&&!deleted?`<button class="messageMenuBtn" title="Unsend" onclick="unsendCommunityMessage('${m.id}','${id}','${channelId||""}')">⋯</button>`:""}</div><div class="workspaceBubble ${deleted?"deleted":""}">${body}</div></div></div>`;}).join("")||`<div class="chatEmpty"><div>💬</div><p>No messages in this channel yet.</p><small>Be the first to start the conversation.</small></div>`;
+  chat.scrollTop=chat.scrollHeight;
+}
+window.refreshCommunityChat=refreshCommunityChat;
+
+async function ensureCommunityChannels(id){
+  const {data,error}=await supabase.rpc("ensure_default_community_channels",{community_id_input:id});
+  if(error) throw error;
+  return data||[];
+}
+
+async function renderCommunity(page,id){
+  const {data:c,error}=await supabase.from("communities").select("*").eq("id",id).single();
+  if(error||!c) return page.innerHTML=empty("Community not found","This community is unavailable.");
+  await supabase.rpc("record_community_view",{community_id_input:id});
+  if(c.creator_id===state.session.user.id) await supabase.rpc("ensure_community_creator_membership",{community_id_input:id});
+  const channels=await ensureCommunityChannels(id);
+  const [membersQ,membershipQ,applicationQ,eventsQ,filesQ]=await Promise.all([
+    supabase.from("community_members").select("*,user:profiles!community_members_user_id_fkey(id,username,display_name,full_name,avatar_url)").eq("community_id",id).order("joined_at",{ascending:true}),
+    supabase.from("community_members").select("role").eq("community_id",id).eq("user_id",state.session.user.id).maybeSingle(),
+    supabase.from("community_applications").select("status").eq("community_id",id).eq("applicant_id",state.session.user.id).maybeSingle(),
+    supabase.from("community_events").select("*").eq("community_id",id).order("starts_at",{ascending:true}).limit(5),
+    supabase.from("community_files").select("*,uploader:profiles!community_files_uploader_id_fkey(display_name,username,avatar_url)").eq("community_id",id).order("created_at",{ascending:false}).limit(5)
+  ]);
+  const queryError=[membersQ,membershipQ,applicationQ,eventsQ,filesQ].find(x=>x.error)?.error;
+  if(queryError) return page.innerHTML=empty("Community unavailable",queryError.message);
+  const joined=!!membershipQ.data || c.creator_id===state.session.user.id;
+  const creator=c.creator_id===state.session.user.id;
+  state.selectedCommunityChannel=state.selectedCommunityChannel&&channels.some(x=>x.id===state.selectedCommunityChannel)?state.selectedCommunityChannel:(channels.find(x=>x.slug==="general")||channels[0])?.id||null;
+  const activeChannel=channels.find(x=>x.id===state.selectedCommunityChannel)||channels[0];
+  let messagesQ=supabase.from("community_messages").select("*,sender:profiles!community_messages_sender_id_fkey(username,display_name,full_name,avatar_url)").eq("community_id",id).order("created_at",{ascending:true}).limit(200);
+  if(activeChannel?.id)messagesQ=messagesQ.eq("channel_id",activeChannel.id);
+  const {data:messages,error:messagesError}=await messagesQ;
+  if(messagesError) return page.innerHTML=empty("Community chat unavailable",messagesError.message);
+  let directConvs=[];
+  const cmQ=await supabase.from("conversation_members").select("conversation_id").eq("user_id",state.session.user.id).limit(8);
+  if(!cmQ.error&&cmQ.data?.length){const ids=cmQ.data.map(x=>x.conversation_id);const cv=await supabase.from("conversations").select("*").in("id",ids).order("updated_at",{ascending:false}).limit(5);directConvs=cv.data||[];}
+  const creatorMember=(membersQ.data||[]).find(m=>m.role==="creator");
+  page.innerHTML=`<div class="communityWorkspace">
+    <div class="workspaceHeader">
+      <button class="back workspaceBack" onclick="history.back()">← Back</button>
+      <div class="workspaceHero" ${c.banner_url?`style="background-image:linear-gradient(90deg,rgba(8,17,31,.72),rgba(8,17,31,.12)),url('${esc(c.banner_url)}')"`:''}>
+        ${image(c.logo_url,c.name,"workspaceCommunityLogo")}
+        <div class="workspaceHeroText"><div class="eyebrow">${esc(c.category||"COMMUNITY")}</div><h1>${esc(c.name)} <span class="publicBadge">Public</span></h1><p>${esc(c.description||"Build together.")}</p><small>${c.member_count||0} members · ${c.view_count||0} views · Created ${timeAgo(c.created_at)} · ${esc(c.remote_mode||"Remote")}</small></div>
+        <div class="workspaceHeroActions">${creator?`<button class="secondary" onclick="openCommunityModal('${id}')">Edit</button>`:joined?`<button class="secondary" onclick="leaveCommunity('${id}')">Leave</button>`:applicationQ.data?.status==="pending"?`<button class="secondary" disabled>Application pending</button>`:`<button class="primary" onclick="applyCommunity('${id}')">Apply to join</button>`}</div>
+      </div>
+      <div class="workspaceTabs"><button class="workspaceTab active" data-tab="chat">▣ Chat</button></div>
+    </div>
+    <div class="workspaceBody">
+      <aside class="workspaceLeft">
+        <div class="workspaceSideTitle">Channels ${creator?`<button class="channelAddBtn" title="Create channel" onclick="openCreateChannelModal('${id}')">＋</button>`:""}</div>
+        <div class="channelList">${channels.map(ch=>`<div class="channelItemWrap"><button class="channelItem ${ch.id===activeChannel?.id?'active':''}" data-channel-id="${ch.id}" data-channel-name="${esc(ch.name)}" data-channel-topic="${esc(ch.topic||'')}" onclick="selectCommunityChannel('${id}','${ch.id}')"><span>#</span><span class="channelItemName">${esc(ch.name)}</span></button>${creator?`<button class="channelDeleteBtn" title="Delete #${esc(ch.name)}" aria-label="Delete channel" onclick="deleteCommunityChannel(event,'${id}','${ch.id}')">×</button>`:""}</div>`).join("")}</div>
+        <div class="workspaceSideTitle dmTitle">Direct Messages <button onclick="location.hash='messages'">＋</button></div>
+        <div class="communityDMList">${directConvs.length?await communityDMRows(directConvs):`<div class="sideMuted">No direct messages yet.</div>`}</div>
+        <div class="workspaceUserCard">${image(state.profile?.avatar_url,state.profile?.display_name||state.profile?.username,"avatar")}<div><b>${esc(state.profile?.display_name||state.profile?.username||"Developer")}</b><small>@${esc(state.profile?.username||"")}</small></div><button onclick="location.hash='profile'">View Profile</button></div>
+      </aside>
+      <main class="workspaceCenter">
+        <div class="channelHeader"><div><h2 id="activeChannelName"># ${esc(activeChannel?.name||"general")}</h2><small id="activeChannelTopic">${esc(activeChannel?.topic||"General discussion about ideas, startups and tech")}</small></div><div class="channelHeaderActions"><button class="iconBtn" title="Chat settings" onclick="openCommunityChatSettings('${id}','${activeChannel?.id||""}')">⚙</button></div></div>
+        <div class="workspaceChat" id="communityChat">${(messages||[]).map(m=>`<div class="workspaceMessage ${m.sender_id===state.session.user.id?"mine":""}">${image(m.sender?.avatar_url,m.sender?.display_name||m.sender?.username,"avatar tiny")}<div class="workspaceMessageBody"><div class="workspaceMessageMeta"><b>${esc(m.sender?.display_name||m.sender?.username)}</b><small>${timeAgo(m.created_at)}</small></div><div class="workspaceBubble">${esc(m.content)}</div></div></div>`).join("")||`<div class="chatEmpty"><div>💬</div><p>No messages in this channel yet.</p><small>Be the first to start the conversation.</small></div>`}</div>
+        ${joined?`<form id="communityChatForm" class="workspaceComposer"><input type="file" id="communityMessageFile" class="hidden" accept="image/*,.pdf,.txt,.zip,.doc,.docx,.xls,.xlsx,.ppt,.pptx"><button type="button" class="composerIcon" title="Attach file" onclick="document.querySelector('#communityMessageFile').click()">＋</button><button type="button" class="composerIcon" id="communityVoiceBtn" title="Record voice note" onclick="toggleCommunityVoiceRecording('${id}','${activeChannel?.id||""}')">🎙</button><input name="message" autocomplete="off" placeholder="Message #${esc(activeChannel?.name||"general")}…"><button class="sendButton" aria-label="Send">➤</button></form>`:`<div class="joinChatNotice">Join the community to participate in chat.</div>`}
+      </main>
+      <aside class="workspaceRight">
+        <section class="rightCard"><div class="rightTitle"><h3>Members (${membersQ.data?.length||0})</h3><button class="linkButton" onclick="openPeopleListForCommunity('${id}')">View all</button></div><div class="memberRoster">${(membersQ.data||[]).slice(0,8).map(m=>`<button class="rosterRow" onclick="location.hash='user?id=${m.user?.id}'">${image(m.user?.avatar_url,m.user?.display_name||m.user?.username,"avatar small")}<span><b>${esc(m.user?.display_name||m.user?.username||"Developer")}</b><small>${esc(m.role||"member")} · ${m.user?.id===state.session.user.id?"Online":"Member"}</small></span>${m.role==="creator"?`<em>♛</em>`:""}</button>`).join("")}</div></section>
+        <section class="rightCard"><h3>Community Settings</h3><div class="settingLine"><span>◉</span> Public Community</div><div class="settingLine"><span>♧</span> ${c.recruitment_enabled?"Recruitment Enabled":"Recruitment Closed"}</div><div class="settingLine"><span>◷</span> ${c.member_count||0} Members</div><div class="settingLine"><span>⌖</span> ${esc(c.location||c.remote_mode||"Remote")}</div></section>
+        <section class="rightCard"><div class="rightTitle"><h3>Upcoming Events</h3>${creator?`<button class="linkButton" onclick="openCommunityEventModal('${id}')">+ Add</button>`:""}</div>${(eventsQ.data||[]).map(e=>`<div class="resourceRow"><div class="resourceIcon">◷</div><div><b>${esc(e.title)}</b><small>${new Date(e.starts_at).toLocaleString([], {dateStyle:"medium",timeStyle:"short"})}</small></div></div>`).join("")||`<div class="sideMuted">No events scheduled.</div>`}</section>
+        <section class="rightCard"><div class="rightTitle"><h3>Recent Files</h3>${joined?`<button class="linkButton" onclick="openCommunityFileModal('${id}')">+ Add</button>`:""}</div>${(filesQ.data||[]).map(f=>`<a class="resourceRow" href="${esc(f.url)}" target="_blank" rel="noreferrer"><div class="resourceIcon">▣</div><div><b>${esc(f.name)}</b><small>${esc(f.uploader?.display_name||f.uploader?.username||"Member")} · ${timeAgo(f.created_at)}</small></div></a>`).join("")||`<div class="sideMuted">No shared files yet.</div>`}</section>
+        ${creator&&c.recruitment_enabled?`<section class="rightCard" id="communityApplications"><h3>Recruitment</h3><p class="sideMuted">Loading applications…</p></section>`:""}
+      </aside>
+    </div>
+  </div>`;
+  document.querySelector("#communityChat")?.scrollTo({top:999999,behavior:"instant"});
+  document.querySelector("#communityChatForm")?.addEventListener("submit",async e=>{
+    e.preventDefault();const input=e.target.message,fileInput=document.querySelector("#communityMessageFile"),button=e.target.querySelector(".sendButton");const text=input.value.trim(),file=fileInput?.files?.[0];if(!text&&!file)return;button.disabled=true;
+    try{let attachmentUrl=null,attachmentName=null,attachmentType=null;if(file){const up=await uploadMessageFile(file,"community",id);attachmentUrl=up.url;attachmentName=up.name;attachmentType=up.type;}const {error}=await supabase.rpc("send_community_message",{community_id_input:id,channel_id_input:activeChannel?.id||null,content_input:text,attachment_url_input:attachmentUrl,attachment_name_input:attachmentName,attachment_type_input:attachmentType,voice_url_input:null});if(error)throw error;input.value="";if(fileInput)fileInput.value="";await refreshCommunityChat(id,activeChannel?.id);}catch(err){toast(err.message||"Could not send message.","error");}finally{button.disabled=false;}
+  });
+  if(creator&&c.recruitment_enabled) await loadCommunityApplications(id);
+}
+
+async function communityDMRows(convs){const rows=[];for(const c of convs){const {data:u}=await supabase.from("conversation_members").select("user:profiles!conversation_members_user_id_fkey(id,display_name,full_name,username,avatar_url)").eq("conversation_id",c.id).neq("user_id",state.session.user.id).limit(1).maybeSingle();const user=u?.user;if(user)rows.push(`<button class="dmRow" onclick="location.hash='messages?conversation=${c.id}'">${image(user.avatar_url,user.display_name||user.username,"avatar small")}<span><b>${esc(user.display_name||user.username)}</b><small>Direct message</small></span></button>`);}return rows.join("")||`<div class="sideMuted">No direct messages yet.</div>`;}
+window.selectCommunityChannel=async function(id,channelId){
+  state.selectedCommunityChannel=channelId;
+  document.querySelectorAll(".channelItem").forEach(b=>b.classList.toggle("active",b.dataset.channelId===channelId));
+  const active=document.querySelector(`.channelItem[data-channel-id="${channelId}"]`);
+  const name=active?.dataset.channelName||"general";
+  const topic=active?.dataset.channelTopic||"General discussion about ideas, startups and tech";
+  const h=document.querySelector("#activeChannelName");if(h)h.textContent=`# ${name}`;
+  const t=document.querySelector("#activeChannelTopic");if(t)t.textContent=topic;
+  await refreshCommunityChat(id,channelId);
+};
+
+async function isCommunityCreator(id){const {data}=await supabase.from("communities").select("creator_id").eq("id",id).single();return data?.creator_id===state.session.user.id;}
+window.openCommunityPostModal=async function(communityId){
+  modal(`<h2>New community post</h2><form id="communityPostForm"><label>Title<input name="title" required maxlength="180"></label><label>Content<textarea name="content" required rows="7"></textarea></label><button class="primary full">Publish</button></form>`);
+  document.querySelector("#communityPostForm").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);const {error}=await supabase.from("community_posts").insert({community_id:communityId,author_id:state.session.user.id,title:String(f.get("title")),content:String(f.get("content"))});if(error)toast(error.message,"error");else{closeModal();toast("Community post published.","success");await switchCommunityTab(communityId,"posts");}};
+};
+
+window.openPeopleListForCommunity=async function(id){const {data}=await supabase.from("community_members").select("user:profiles!community_members_user_id_fkey(id,username,display_name,full_name,avatar_url)").eq("community_id",id).order("joined_at",{ascending:true});modal(`<h2>Community members</h2><div class="peopleList">${(data||[]).map(x=>personRow(x.user)).join("")||`<p class="muted">No members yet.</p>`}</div>`);};
+
+window.leaveCommunity=async id=>{const {error}=await supabase.from("community_members").delete().eq("community_id",id).eq("user_id",state.session.user.id); if(error)toast(error.message,"error");else navigate(`community?id=${id}`);};
+window.applyCommunity=async id=>{const {error}=await supabase.from("community_applications").insert({community_id:id,applicant_id:state.session.user.id,answers:{}});if(error)toast(error.message,"error");else{toast("Application sent.","success");navigate(`community?id=${id}`);}};
+
+async function loadCommunityApplications(communityId){const root=document.querySelector("#communityApplications");if(!root)return;const {data,error}=await supabase.from("community_applications").select("id,status,answers,created_at,applicant:profiles!community_applications_applicant_id_fkey(id,username,display_name,full_name,avatar_url,location)").eq("community_id",communityId).order("created_at",{ascending:false});if(error){root.innerHTML=`<h2>Recruitment applications</h2><p class="muted">${esc(error.message)}</p>`;return;}root.innerHTML=`<h2>Recruitment applications</h2>${(data||[]).map(a=>`<div class="communityApplication">${personRow(a.applicant)}<small class="muted">${esc(a.status)} · ${timeAgo(a.created_at)}</small>${a.status==="pending"?`<div class="appActions"><button class="primary" onclick="reviewCommunityApplication('${a.id}','${communityId}','accepted')">Accept</button><button class="secondary" onclick="reviewCommunityApplication('${a.id}','${communityId}','rejected')">Reject</button></div>`:""}</div>`).join("")||`<p class="muted">No applications yet.</p>`}`;}
+window.reviewCommunityApplication=async function(applicationId,communityId,status){let error=null;if(status==="accepted"){const r=await supabase.rpc("accept_community_application",{application_id_input:applicationId});error=r.error;}else{const r=await supabase.from("community_applications").update({status,reviewed_by:state.session.user.id,updated_at:new Date().toISOString()}).eq("id",applicationId).eq("community_id",communityId);error=r.error;}if(error)return toast(error.message,"error");toast(status==="accepted"?"Applicant accepted and added to the community.":"Application rejected.","success");await renderCommunity(document.querySelector("#page"),communityId);};
+
+async function renderMessages(page){const {data:members}=await supabase.from("conversation_members").select("conversation_id").eq("user_id",state.session.user.id); const ids=(members||[]).map(x=>x.conversation_id); let convs=[]; if(ids.length){const {data}=await supabase.from("conversations").select("*").in("id",ids).order("updated_at",{ascending:false}); convs=data||[];} page.innerHTML=`<div class="pageHead"><div><div class="eyebrow">MESSAGES</div><h1>Direct messages</h1><p>Private conversations with developers.</p></div></div><div class="messagesLayout"><aside class="conversationList">${await conversationList(convs)}</aside><section class="chatPanel" id="chatPanel">${state.selectedConversation?"Loading…":empty("No conversation selected","Open a developer profile and choose Message.")}</section></div>`; if(state.selectedConversation) await loadChat(state.selectedConversation);}
+async function conversationList(convs){if(!convs.length)return empty("No messages","Start a conversation from a developer profile."); const html=[]; for(const c of convs){const {data:other}=await supabase.from("conversation_members").select("user:profiles!conversation_members_user_id_fkey(id,username,display_name,full_name,avatar_url)").eq("conversation_id",c.id).neq("user_id",state.session.user.id).limit(1).maybeSingle();const {data:last}=await supabase.from("messages").select("content,created_at").eq("conversation_id",c.id).order("created_at",{ascending:false}).limit(1).maybeSingle();const u=other?.user;html.push(`<button class="conversationRow ${state.selectedConversation===c.id?"active":""}" onclick="location.hash='messages?conversation=${c.id}'">${image(u?.avatar_url,u?.display_name||u?.full_name||u?.username)}<span><b>${esc(u?.display_name||u?.username||"Developer")}</b><small>${esc(last?.content||"No messages yet")}</small></span><time>${last?timeAgo(last.created_at):""}</time></button>`);} return html.join("");}
+async function loadChat(id){
+  const {data:members}=await supabase.from("conversation_members").select("user:profiles!conversation_members_user_id_fkey(id,username,display_name,full_name,avatar_url)").eq("conversation_id",id);const other=(members||[]).map(x=>x.user).find(u=>u.id!==state.session.user.id);
+  const {data:messages,error}=await supabase.from("messages").select("*").eq("conversation_id",id).order("created_at",{ascending:true});if(error)return toast(error.message,"error");const panel=document.querySelector("#chatPanel");if(!panel)return;
+  panel.innerHTML=`<div class="chatHeader">${image(other?.avatar_url,other?.display_name||other?.username)}<div><b>${esc(other?.display_name||other?.username||"Developer")}</b><small>@${esc(other?.username||"")}</small></div><button class="iconBtn chatSettingsBtn" title="Chat settings" onclick="openDirectChatSettings('${id}')">⚙</button></div><div class="chatMessages" id="chatMessages">${(messages||[]).map(m=>{const own=m.sender_id===state.session.user.id,deleted=!!m.deleted_at;const attachment=m.attachment_url?`<a class="messageAttachment" href="${esc(m.attachment_url)}" target="_blank" rel="noreferrer">📎 ${esc(m.attachment_name||"Attachment")}</a>`:"";const voice=m.voice_url?`<audio class="voicePlayer" controls src="${esc(m.voice_url)}"></audio>${m.voice_duration_seconds?`<small class="voiceDuration">${m.voice_duration_seconds}s</small>`:""}`:"";const body=deleted?`<span class="messageDeleted">Message unsent</span>`:`${m.content?`<div>${esc(m.content)}</div>`:""}${attachment}${voice}`;return `<div class="igMessage ${own?"mine":""}"><div class="bubble ${deleted?"deleted":""}">${body}${own&&!deleted?`<button class="messageMenuBtn" title="Unsend" onclick="unsendDirectMessage('${m.id}','${id}')">⋯</button>`:""}<small>${timeAgo(m.created_at)}</small></div></div>`;}).join("")}</div><form id="chatForm" class="chatComposer"><input type="file" id="directMessageFile" class="hidden" accept="image/*,.pdf,.txt,.zip,.doc,.docx,.xls,.xlsx,.ppt,.pptx"><button type="button" class="composerIcon" title="Attach file" onclick="document.querySelector('#directMessageFile').click()">＋</button><button type="button" class="composerIcon" id="directVoiceBtn" title="Record voice note" onclick="toggleDirectVoiceRecording('${id}')">🎙</button><input name="message" autocomplete="off" placeholder="Message…"><button class="primary">Send</button></form>`;
+  const cm=document.querySelector("#chatMessages");cm.scrollTop=cm.scrollHeight;document.querySelector("#chatForm").onsubmit=async e=>{e.preventDefault();const input=e.target.message,fileInput=document.querySelector("#directMessageFile"),text=input.value.trim(),file=fileInput?.files?.[0];if(!text&&!file)return;const send=e.target.querySelector("button.primary");send.disabled=true;try{let attachmentUrl=null,attachmentName=null,attachmentType=null;if(file){const up=await uploadMessageFile(file,"direct",id);attachmentUrl=up.url;attachmentName=up.name;attachmentType=up.type;}const {error}=await supabase.rpc("send_direct_message",{conversation_id_input:id,content_input:text,attachment_url_input:attachmentUrl,attachment_name_input:attachmentName,attachment_type_input:attachmentType,voice_url_input:null});if(error)throw error;input.value="";if(fileInput)fileInput.value="";await loadChat(id);}catch(err){toast(err.message||"Could not send message.","error");}finally{send.disabled=false;}};await supabase.from("conversation_members").update({last_read_at:new Date().toISOString()}).eq("conversation_id",id).eq("user_id",state.session.user.id);
+}
+
+async function uploadMessageFile(file,scope,entityId){const max=20*1024*1024;if(!file||file.size>max)throw new Error("File must be 20 MB or smaller.");const safe=(file.name||"file").replace(/[^a-zA-Z0-9._-]/g,"_");const path=`${state.session.user.id}/${scope}/${entityId}/${crypto.randomUUID()}-${safe}`;const {error}=await supabase.storage.from("message-media").upload(path,file,{upsert:false,contentType:file.type||"application/octet-stream",cacheControl:"3600"});if(error)throw error;return {url:supabase.storage.from("message-media").getPublicUrl(path).data.publicUrl,name:file.name||safe,type:file.type||"application/octet-stream"};}
+async function recordAndSendVoice({scope,entityId,channelId=null}){if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder)throw new Error("Voice recording is not supported in this browser.");const stream=await navigator.mediaDevices.getUserMedia({audio:true});const mime=MediaRecorder.isTypeSupported("audio/webm;codecs=opus")?"audio/webm;codecs=opus":"audio/webm";const recorder=new MediaRecorder(stream,{mimeType:mime});const chunks=[];return await new Promise((resolve,reject)=>{const started=Date.now();recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};recorder.onerror=e=>{stream.getTracks().forEach(t=>t.stop());reject(e.error||new Error("Recording failed."));};recorder.onstop=async()=>{stream.getTracks().forEach(t=>t.stop());try{const blob=new Blob(chunks,{type:mime});const file=new File([blob],`voice-${Date.now()}.webm`,{type:mime});const up=await uploadMessageFile(file,scope,entityId);const voiceUrl=up.url;const duration=Math.max(1,Math.round((Date.now()-started)/1000));let r;if(scope==="community")r=await supabase.rpc("send_community_message",{community_id_input:entityId,channel_id_input:channelId,content_input:"",attachment_url_input:null,attachment_name_input:null,attachment_type_input:null,voice_url_input:voiceUrl,voice_duration_input:duration});else r=await supabase.rpc("send_direct_message",{conversation_id_input:entityId,content_input:"",attachment_url_input:null,attachment_name_input:null,attachment_type_input:null,voice_url_input:voiceUrl,voice_duration_input:duration});if(r.error)throw r.error;resolve(duration);}catch(err){reject(err);}};recorder.start();setTimeout(()=>{if(recorder.state!=="inactive")recorder.stop();},60000);window.__activeRecorder=recorder;});}
+window.toggleCommunityVoiceRecording=async function(id,channelId){const btn=document.querySelector("#communityVoiceBtn");if(window.__activeRecorder?.state==="recording"){window.__activeRecorder.stop();return;}try{if(btn)btn.textContent="⏹";await recordAndSendVoice({scope:"community",entityId:id,channelId});await refreshCommunityChat(id,channelId);}catch(err){toast(err.message||"Could not record voice note.","error");}finally{if(btn)btn.textContent="🎙";window.__activeRecorder=null;}};
+window.toggleDirectVoiceRecording=async function(id){const btn=document.querySelector("#directVoiceBtn");if(window.__activeRecorder?.state==="recording"){window.__activeRecorder.stop();return;}try{if(btn)btn.textContent="⏹";await recordAndSendVoice({scope:"direct",entityId:id});await loadChat(id);}catch(err){toast(err.message||"Could not record voice note.","error");}finally{if(btn)btn.textContent="🎙";window.__activeRecorder=null;}};
+window.unsendCommunityMessage=async function(messageId,communityId,channelId){const {error}=await supabase.rpc("unsend_community_message",{message_id_input:messageId});if(error)toast(error.message,"error");else await refreshCommunityChat(communityId,channelId||state.selectedCommunityChannel);};
+window.unsendDirectMessage=async function(messageId,conversationId){const {error}=await supabase.rpc("unsend_direct_message",{message_id_input:messageId});if(error)toast(error.message,"error");else await loadChat(conversationId);};
+window.openCommunityChatSettings=function(communityId,channelId){modal(`<h2>Chat settings</h2><p class="muted">Delete this channel's chat history from your view.</p><button class="danger full" onclick="clearCommunityChatHistory('${communityId}','${channelId}')">Delete chat history</button>`);};
+window.clearCommunityChatHistory=async function(communityId,channelId){const {error}=await supabase.rpc("clear_community_chat_history",{community_id_input:communityId,channel_id_input:channelId});if(error)return toast(error.message,"error");closeModal();toast("Chat history cleared for you.","success");await refreshCommunityChat(communityId,channelId);};
+window.openDirectChatSettings=function(conversationId){modal(`<h2>Chat settings</h2><p class="muted">This clears the conversation from your view only.</p><button class="danger full" onclick="clearDirectChatHistory('${conversationId}')">Delete chat history</button>`);};
+window.clearDirectChatHistory=async function(conversationId){const {error}=await supabase.rpc("clear_direct_chat_history",{conversation_id_input:conversationId});if(error)return toast(error.message,"error");closeModal();toast("Chat history cleared for you.","success");await loadChat(conversationId);};
+window.openCreateChannelModal=function(communityId){modal(`<h2>Create channel</h2><form id="channelCreateForm"><label>Channel name<input name="name" required maxlength="50" placeholder="design-review"></label><label>Topic<input name="topic" maxlength="120" placeholder="What is this channel for?"></label><button class="primary full">Create channel</button></form>`);document.querySelector("#channelCreateForm").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target),b=e.target.querySelector("button");b.disabled=true;try{const {error}=await supabase.rpc("create_community_channel",{community_id_input:communityId,name_input:String(f.get("name")),topic_input:String(f.get("topic")||"")});if(error)throw error;closeModal();toast("Channel created.","success");await renderCommunity(document.querySelector("#page"),communityId);}catch(err){toast(err.message||"Could not create channel.","error");}finally{b.disabled=false;}};};
+window.deleteCommunityChannel=async function(event,communityId,channelId){
+  event?.preventDefault(); event?.stopPropagation();
+  const wrap=event?.currentTarget?.closest(".channelItemWrap");
+  const channelName=wrap?.querySelector(".channelItemName")?.textContent?.trim()||"this channel";
+  if(!confirm(`Delete #${channelName}?\n\nThis removes the channel and its chat history for everyone. This cannot be undone.`)) return;
+  const button=event?.currentTarget; if(button) button.disabled=true;
+  try{
+    const {error}=await supabase.rpc("delete_community_channel",{community_id_input:communityId,channel_id_input:channelId});
+    if(error) throw error;
+    if(state.selectedCommunityChannel===channelId) state.selectedCommunityChannel=null;
+    toast(`#${channelName} deleted.` ,"success");
+    await renderCommunity(document.querySelector("#page"),communityId);
+  }catch(err){toast(err.message||"Could not delete channel.","error");if(button)button.disabled=false;}
+};
+
+async function renderNotifications(page){await loadNotifications();page.innerHTML=`<div class="pageHead"><div><div class="eyebrow">NOTIFICATIONS</div><h1>Activity</h1><p>Likes, comments, follows, messages and community activity.</p></div><button class="secondary" id="readAll">Mark all read</button></div><div class="notificationList">${state.notifications.length?state.notifications.map(n=>`<button class="notification ${n.is_read?"":"unread"}" onclick="markNotification('${n.id}')">${image(n.actor?.avatar_url,n.actor?.display_name||n.actor?.username)}<span><p>${esc(n.message)}</p><small>${timeAgo(n.created_at)}</small></span></button>`).join(""):empty("You're all caught up","New activity will appear here.")}</div>`;document.querySelector("#readAll").onclick=async()=>{await supabase.from("notifications").update({is_read:true}).eq("recipient_id",state.session.user.id);await loadNotifications();renderShell();navigate("notifications");};}
+async function loadNotifications(){const {data}=await supabase.from("notifications").select("*,actor:profiles!notifications_actor_id_fkey(id,username,display_name,full_name,avatar_url)").eq("recipient_id",state.session.user.id).order("created_at",{ascending:false}).limit(100);state.notifications=data||[];}
+const unreadNotificationCount=()=>state.notifications.filter(x=>!x.is_read).length;
+async function markNotification(id){await supabase.from("notifications").update({is_read:true}).eq("id",id).eq("recipient_id",state.session.user.id);await loadNotifications();renderShell();navigate("notifications");} window.markNotification=markNotification;
+
+async function renderSettings(page){page.innerHTML=`<div class="pageHead"><div><div class="eyebrow">SETTINGS</div><h1>Account settings</h1><p>Your account controls.</p></div></div><div class="settingsGrid"><div class="card"><h2>Account</h2><label>Email<input disabled value="${esc(state.session.user.email||"")}"></label><button class="secondary" id="resetPassword">Send password reset email</button></div><div class="card"><h2>Session</h2><button class="danger" id="settingsLogout">Log out</button></div></div>`;document.querySelector("#resetPassword").onclick=async()=>{const {error}=await supabase.auth.resetPasswordForEmail(state.session.user.email,{redirectTo:location.origin});toast(error?.message||"Reset email sent.",error?"error":"success");};document.querySelector("#settingsLogout").onclick=()=>supabase.auth.signOut();}
+
+function modal(content){closeModal();const el=document.createElement("div");el.id="modalRoot";el.className="modalBackdrop";el.innerHTML=`<div class="modal"><button class="modalClose" onclick="closeModal()">×</button>${content}</div>`;document.body.appendChild(el);}
+function closeModal(){document.querySelector("#modalRoot")?.remove();} window.closeModal=closeModal;
+
+function openPostModal(){modal(`<h2>Create a post</h2><form id="postForm"><label>Title<input name="title" required maxlength="180"></label><label>Details<textarea name="content" required rows="7"></textarea></label><label>Technology tags<input name="tags" placeholder="React, Supabase, JavaScript"></label><label>Category<select name="category"><option>Developer Problem</option><option>Startup Discussion</option><option>Project Showcase</option><option>Collaboration</option><option>Question</option></select></label><button class="primary full">Publish post</button></form>`);document.querySelector("#postForm").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);const {error}=await supabase.from("posts").insert({author_id:state.session.user.id,title:f.get("title"),content:f.get("content"),tags:String(f.get("tags")).split(",").map(x=>x.trim()).filter(Boolean),category:f.get("category")});if(error)toast(error.message,"error");else{closeModal();toast("Post published.","success");navigate("home");}};} window.openPostModal=openPostModal;
+
+async function uploadImage(file,bucket,path){
+  if(!file)return null;
+  const allowed=["image/png","image/jpeg","image/webp","image/gif"];
+  if(!allowed.includes(file.type)) throw new Error("Please choose a PNG, JPG, WEBP or GIF image.");
+  if(file.size>5*1024*1024) throw new Error("Image must be smaller than 5 MB.");
+  const ext=(file.name.split(".").pop()||"jpg").toLowerCase().replace(/[^a-z0-9]/g,"");
+  const final=`${path}.${ext}`;
+  const {error}=await supabase.storage.from(bucket).upload(final,file,{upsert:false,contentType:file.type,cacheControl:"3600"});
+  if(error) throw error;
+  return supabase.storage.from(bucket).getPublicUrl(final).data.publicUrl;
+}
+
+function openProfileModal(){const p=state.profile||{};modal(`<h2>Edit profile</h2><form id="profileForm"><label>Profile picture<input name="avatar" type="file" accept="image/*"></label><label>Display name<input name="displayName" value="${esc(p.display_name||p.full_name||"")}"></label><label>Bio<textarea name="bio" rows="4">${esc(p.bio||"")}</textarea></label><label>Location<input name="location" value="${esc(p.location||"")}"></label><label>Skills<input name="skills" value="${esc((p.skills||[]).join(", "))}"></label><label>Experience<textarea name="experience" rows="4">${esc(p.experience||"")}</textarea></label><label>GitHub URL<input name="githubUrl" value="${esc(p.github_url||"")}"></label><label>LinkedIn URL<input name="linkedinUrl" value="${esc(p.linkedin_url||"")}"></label><label>Portfolio URL<input name="portfolioUrl" value="${esc(p.portfolio_url||"")}"></label><label>Website<input name="websiteUrl" value="${esc(p.website_url||"")}"></label><div class="sectionTitle"><h3>Projects</h3><button type="button" class="secondary" onclick="closeModal();openProjectModal()">+ Add project</button></div><button class="primary full">Save changes</button></form>`);document.querySelector("#profileForm").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);try{let avatar=p.avatar_url;if(f.get("avatar")?.size) avatar=await uploadImage(f.get("avatar"),"avatars",`${state.session.user.id}/avatar`);const patch={avatar_url:avatar,display_name:f.get("displayName"),bio:f.get("bio"),location:f.get("location"),skills:String(f.get("skills")).split(",").map(x=>x.trim()).filter(Boolean),experience:f.get("experience"),github_url:f.get("githubUrl"),linkedin_url:f.get("linkedinUrl"),portfolio_url:f.get("portfolioUrl"),website_url:f.get("websiteUrl"),updated_at:new Date().toISOString()};const {error}=await supabase.from("profiles").update(patch).eq("id",state.session.user.id);if(error)throw error;await profile();closeModal();renderShell();navigate("profile");toast("Profile updated.","success");}catch(err){toast(err.message,"error");}};}
+window.openProfileModal=openProfileModal;
+
+function openProjectModal(){modal(`<h2>Add project</h2><form id="projectForm"><label>Project name<input name="name" required></label><label>Description<textarea name="description" rows="4"></textarea></label><label>Project URL<input name="url"></label><label>Repository URL<input name="repo"></label><label>Technologies<input name="tech" placeholder="Next.js, Supabase"></label><label>Community <select name="community"><option value="">No community</option></select></label><button class="primary full">Save project</button></form>`);loadUserCommunityOptions();document.querySelector("#projectForm").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);const {error}=await supabase.from("projects").insert({owner_id:state.session.user.id,name:f.get("name"),description:f.get("description"),url:f.get("url"),repository_url:f.get("repo"),technologies:String(f.get("tech")).split(",").map(x=>x.trim()).filter(Boolean),community_id:f.get("community")||null});if(error)toast(error.message,"error");else{closeModal();toast("Project added.","success");navigate("profile");}};}
+window.openProjectModal=openProjectModal;
+async function loadUserCommunityOptions(){const select=document.querySelector('[name="community"]'); if(!select)return; try{ const [{data:members,error:memberError},{data:created,error:createdError}]=await Promise.all([supabase.from("community_members").select("community_id").eq("user_id",state.session.user.id),supabase.from("communities").select("id,name").eq("creator_id",state.session.user.id)]); if(memberError||createdError)throw memberError||createdError; const ids=[...new Set([...(members||[]).map(x=>x.community_id),...(created||[]).map(x=>x.id)].filter(Boolean))]; if(!ids.length){select.innerHTML='<option value="">No joined communities</option>'; return;} const {data:communities,error:communityError}=await supabase.from("communities").select("id,name").in("id",ids).order("name"); if(communityError)throw communityError; select.innerHTML='<option value="">No community</option>'+(communities||[]).map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join(''); }catch(err){select.innerHTML='<option value="">No joined communities</option>'; console.error(err);}}
+
+async function openCommunityModal(id=null){
+  let c=null;
+  if(id){
+    const r=await supabase.from("communities").select("*").eq("id",id).single();
+    if(r.error)return toast(r.error.message,"error");
+    c=r.data;
+    if(!c||c.creator_id!==state.session.user.id)return toast("Only the community creator can edit it.","error");
+  }
+  modal(`<h2>${c?"Edit":"Create"} community</h2><form id="communityForm" class="communityForm">
+    <div class="logoPicker"><div id="communityLogoPreview">${image(c?.logo_url,c?.name||"Community","communityLogoPreviewImg")}</div><div><label>Community logo<input name="logo" type="file" accept="image/png,image/jpeg,image/webp,image/gif"></label><small>PNG, JPG, WEBP or GIF · max 5 MB</small></div></div>
+    <label>Name<input name="name" required maxlength="80" value="${esc(c?.name||"")}"></label>
+    <label>Description<textarea name="description" required rows="4" maxlength="500">${esc(c?.description||"")}</textarea></label>
+    <div class="modalTwoCol"><label>Category<input name="category" value="${esc(c?.category||"")}"></label><label>Required skills<input name="skills" value="${esc((c?.required_skills||[]).join(", "))}"></label></div>
+    <label>Rules<textarea name="rules" rows="4">${esc(c?.rules||"")}</textarea></label>
+    <div class="modalTwoCol"><label>Location<input name="location" value="${esc(c?.location||"")}" placeholder="City, Country or Remote"></label><label>Remote mode<select name="remote"><option ${c?.remote_mode==="Remote"||!c?"selected":""}>Remote</option><option ${c?.remote_mode==="Hybrid"?"selected":""}>Hybrid</option><option ${c?.remote_mode==="Onsite"?"selected":""}>Onsite</option></select></label></div>
+    <label class="checkLabel"><input type="checkbox" name="recruitment" ${c?.recruitment_enabled?"checked":""}><span>Enable recruitment</span></label>
+    <button class="primary full" id="communitySaveBtn">${c?"Save changes":"Create community"}</button>
+  </form>`);
+  const form=document.querySelector("#communityForm");
+  const fileInput=form.querySelector('[name="logo"]');
+  fileInput.onchange=()=>{const f=fileInput.files?.[0];if(!f)return;const img=document.createElement("img");img.className="communityLogoPreviewImg";img.alt="Community logo preview";img.src=URL.createObjectURL(f);document.querySelector("#communityLogoPreview").replaceChildren(img);};
+  form.onsubmit=async e=>{
+    e.preventDefault();
+    const button=document.querySelector("#communitySaveBtn");button.disabled=true;button.textContent=c?"Saving…":"Creating…";
+    const f=new FormData(form);
+    try{
+      const base={name:String(f.get("name")).trim(),description:String(f.get("description")).trim(),category:String(f.get("category")||"").trim(),skills_input:String(f.get("skills")||"").split(",").map(x=>x.trim()).filter(Boolean),rules:String(f.get("rules")||"").trim(),remote:String(f.get("remote")||"Remote"),recruitment:f.has("recruitment"),location:String(f.get("location")||"").trim()};
+      if(!base.name||!base.description)throw new Error("Name and description are required.");
+      let communityId=id;
+      if(!c){
+        const r=await supabase.rpc("create_community",{name_input:base.name,description_input:base.description,category_input:base.category,skills_input:base.skills_input,rules_input:base.rules,remote_mode_input:base.remote,recruitment_input:base.recruitment,location_input:base.location,logo_url_input:null});
+        if(r.error)throw r.error;communityId=r.data;
+      }
+      let logoUrl=c?.logo_url||null;
+      if(fileInput.files?.[0]){
+        const safePath=`${state.session.user.id}/${communityId}/${crypto.randomUUID()}`;
+        logoUrl=await uploadImage(fileInput.files[0],"community-avatars",safePath);
+      }
+      const r=await supabase.rpc("update_community",{community_id_input:communityId,name_input:base.name,description_input:base.description,category_input:base.category,skills_input:base.skills_input,rules_input:base.rules,remote_mode_input:base.remote,recruitment_input:base.recruitment,location_input:base.location,logo_url_input:logoUrl});
+      if(r.error)throw r.error;
+      closeModal();toast(c?"Community updated.":"Community created.","success");navigate(`community?id=${communityId}`);
+    }catch(err){toast(err.message||"Could not save community.","error");button.disabled=false;button.textContent=c?"Save changes":"Create community";}
+  };
+}
+window.openCommunityModal=openCommunityModal;
+
+window.openCommunityEventModal=async function(communityId){
+  modal(`<h2>Add community event</h2><form id="eventForm"><label>Event title<input name="title" required maxlength="120"></label><label>Description<textarea name="description" rows="3"></textarea></label><label>Starts at<input name="starts" type="datetime-local" required></label><label>Ends at<input name="ends" type="datetime-local"></label><label>Meeting URL<input name="url" placeholder="https://…"></label><button class="primary full">Create event</button></form>`);
+  document.querySelector("#eventForm").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);const {error}=await supabase.from("community_events").insert({community_id:communityId,creator_id:state.session.user.id,title:String(f.get("title")),description:String(f.get("description")||""),starts_at:new Date(f.get("starts")).toISOString(),ends_at:f.get("ends")?new Date(f.get("ends")).toISOString():null,meeting_url:String(f.get("url")||"")});if(error)toast(error.message,"error");else{closeModal();toast("Event created.","success");renderCommunity(document.querySelector("#page"),communityId);}};
+};
+window.openCommunityFileModal=async function(communityId){
+  modal(`<h2>Add shared resource</h2><form id="fileForm"><label>Name<input name="name" required maxlength="160"></label><label>URL<input name="url" type="url" required placeholder="https://…"></label><label>Type<input name="type" placeholder="PDF, Design, Docs…"></label><button class="primary full">Add resource</button></form>`);
+  document.querySelector("#fileForm").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);const {error}=await supabase.from("community_files").insert({community_id:communityId,uploader_id:state.session.user.id,name:String(f.get("name")),url:String(f.get("url")),file_type:String(f.get("type")||"")});if(error)toast(error.message,"error");else{closeModal();toast("Resource added.","success");renderCommunity(document.querySelector("#page"),communityId);}};
+};
+
+function subscribeRealtime(){if(state.realtime)state.realtime.unsubscribe();state.realtime=supabase.channel("live-coders-live").on("postgres_changes",{event:"*",schema:"public",table:"messages"},async p=>{if(state.route==="messages"&&p.new?.conversation_id===state.selectedConversation)loadChat(state.selectedConversation);}).on("postgres_changes",{event:"INSERT",schema:"public",table:"notifications",filter:`recipient_id=eq.${state.session.user.id}`},async()=>{await loadNotifications();const b=document.querySelector("#notifBadge");if(b){b.textContent=unreadNotificationCount();b.classList.toggle("hidden",!unreadNotificationCount());}}).on("postgres_changes",{event:"INSERT",schema:"public",table:"community_messages"},async p=>{if(state.route==="community"){const id=new URLSearchParams(location.hash.split("?")[1]||"").get("id");if(id===p.new?.community_id)refreshCommunityChat(id);}}).on("postgres_changes",{event:"*",schema:"public",table:"post_comments"},async()=>{if(state.route==="home")navigate("home");}).subscribe();}
+
+bootstrap();

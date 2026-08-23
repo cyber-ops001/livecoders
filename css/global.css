@@ -6590,3 +6590,96 @@ img {
     bottom: 46px;
   }
 }
+
+/* V18 discovery + recruitment polish */
+.searchResultsGrid {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0 30px 28px;
+}
+.feedListCompact {
+  display: grid;
+  gap: 10px;
+}
+.postSearchRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 15px 16px;
+  border: 1px solid #1b2d43;
+  border-radius: 12px;
+  background: #0b1523;
+}
+.postSearchRow b {
+  display: block;
+  color: #f3f7fb;
+}
+.postSearchRow small {
+  display: block;
+  margin-top: 4px;
+  color: #71839a;
+}
+.postSearchRow p {
+  margin: 7px 0 0;
+  color: #93a2b5;
+  line-height: 1.45;
+}
+.recruitmentPill {
+  display: inline-flex !important;
+  width: max-content;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #0d2139;
+  border: 1px solid #21466f;
+  color: #74b2ff !important;
+  font-weight: 800;
+}
+.trendingCommunityRow {
+  grid-template-columns: 48px minmax(0, 1fr) 120px;
+}
+.trendingCommunityRow .trendingCommunityInfo {
+  min-width: 0;
+}
+.trendingCommunityRow .trendingCommunityInfo p {
+  white-space: nowrap;
+}
+.communityIcon.medium {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+}
+.communityCardBody {
+  min-width: 0;
+}
+.communityCardActions {
+  align-items: stretch;
+}
+.communityCardActions button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+@media (max-width: 760px) {
+  .searchResultsGrid {
+    padding-left: 15px;
+    padding-right: 15px;
+  }
+  .postSearchRow {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .postSearchRow button {
+    width: 100%;
+  }
+  .trendingCommunityRow {
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+  .trendingCommunityRow .trendingCommunityInfo p {
+    white-space: normal;
+  }
+  .trendingCommunityRow .primary,
+  .trendingCommunityRow .secondary {
+    grid-column: 2;
+    width: 100%;
+  }
+}
