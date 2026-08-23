@@ -83,3 +83,14 @@ V14 adds:
 - Friend-circle ranking using mutual follows.
 - Engagement + freshness ranking so useful content can gradually spread beyond the author's friend circle.
 - Blogs and reels remain posts in one unified feed; there are no separate blog/reel feeds.
+
+
+## V18 updates
+- Global top search searches developers, posts and communities.
+- Search results are cached briefly and community catalog is cached to reduce repeated requests.
+- Home feed loads fewer posts and batches the current user's likes instead of making one like query per post.
+- Community recruitment now has three modes: Open, Application, Closed.
+- Open recruitment uses a secure Supabase RPC for instant joining.
+- Application recruitment shows only pending applications to the community head and supports accept/deny.
+- Rejected/withdrawn applications can be submitted again.
+- Added Trading & Finance as a community category.
