@@ -14,7 +14,6 @@ const state = {
   route: "home",
   selectedConversation: null,
   notifications: [],
-    notificationVisibleCount: 10,
   searchTimer: null,
   realtime: null,
   selectedCommunityChannel: null,
@@ -25,9 +24,6 @@ const state = {
   publicAuthMode: "login",
   feedPriorityIds: [],
   homeFeedPosts: [],
-  likedPostIds: new Set(),
-  commentLikeIds: new Set(),
-  likedPostIdsReady: false,
 };
 
 const app = document.querySelector("#app");
@@ -609,33 +605,25 @@ async function getPosts(filter = {}) {
 function renderBlogGallery(pages = [], title = "") {
   if (!pages.length) return "";
   const first = pages[0] || {};
-  const cover = first.cover
-    ? `<div class="blogCoverView"><img loading="lazy" src="${esc(first.cover)}" alt="${esc(title || "Blog cover")}"></div>`
-    : "";
+  const cover = first.cover ? `<div class="blogCoverView"><img loading="lazy" src="${esc(first.cover)}" alt="${esc(title || "Blog cover")}"></div>` : "";
   const pageSlides = pages.map((page, i) => {
     const imgs = Array.isArray(page?.images) ? page.images : [];
     const text = typeof page === "string" ? page : String(page?.text || "");
-    return `<section class="blogPage" data-blog-page="${i}" ${i ? "hidden" : ""}>
+    return `<section class="blogPage" data-blog-page="${i}" ${i ? 'hidden' : ''}>
       <div class="blogPageHeader"><span class="pageNo">Page ${i + 1} / ${pages.length}</span></div>
-      <div class="blogPageFrame">
-        ${text ? `<p>${esc(text)}</p>` : ""}
-        ${imgs.length ? `<div class="blogImageStrip">${imgs.map((src, j) => `<img loading="lazy" src="${esc(src)}" alt="${esc(title || "Blog image")} ${j + 1}">`).join("")}</div>` : ""}
-      </div>
+      ${text ? `<p>${esc(text)}</p>` : ""}
+      ${imgs.length ? `<div class="blogImageStrip">${imgs.map((src, j) => `<img loading="lazy" src="${esc(src)}" alt="${esc(title || "Blog image")} ${j + 1}">`).join("")}</div>` : ""}
     </section>`;
   }).join("");
   return `<div class="blogViewer" data-blog-viewer>
-    <div class="blogViewport">
-      ${cover}
-      <div class="blogPages">${pageSlides}</div>
-    </div>
+    ${cover}
+    <div class="blogPages">${pageSlides}</div>
     ${pages.length > 1 ? `<div class="blogPagerControls"><button type="button" class="secondary" data-blog-prev disabled>← Previous</button><span data-blog-counter>Page 1 / ${pages.length}</span><button type="button" class="secondary" data-blog-next>Next →</button></div>` : ""}
   </div>`;
 }
 
 function wireBlogViewers(root = document) {
   root.querySelectorAll("[data-blog-viewer]").forEach((viewer) => {
-    if (viewer.dataset.wired === "1") return;
-    viewer.dataset.wired = "1";
     const pages = [...viewer.querySelectorAll("[data-blog-page]")];
     if (pages.length < 2) return;
     let index = 0;
@@ -648,8 +636,8 @@ function wireBlogViewers(root = document) {
       if (prev) prev.disabled = index === 0;
       if (next) next.disabled = index === pages.length - 1;
     };
-    prev?.addEventListener("click", (e) => { e.preventDefault(); if (index > 0) { index--; paint(); } });
-    next?.addEventListener("click", (e) => { e.preventDefault(); if (index < pages.length - 1) { index++; paint(); } });
+    prev?.addEventListener("click", () => { if (index > 0) { index--; paint(); } });
+    next?.addEventListener("click", () => { if (index < pages.length - 1) { index++; paint(); } });
     let touchX = null;
     viewer.addEventListener("touchstart", e => { touchX = e.touches[0]?.clientX ?? null; }, { passive: true });
     viewer.addEventListener("touchend", e => {
@@ -662,7 +650,6 @@ function wireBlogViewers(root = document) {
       }
       touchX = null;
     }, { passive: true });
-    paint();
   });
 }
 
@@ -684,15 +671,15 @@ function togglePostText(id) {
 }
 window.togglePostText = togglePostText;
 
-async function postCard(p, likedOverride = null) {
+async function postCard(p) {
   trackInterest("category", p.category || "");
   (p.tags || []).slice(0, 5).forEach((t) => trackInterest("topic", t));
-  let liked = likedOverride;
-  if (liked === null && state.likedPostIdsReady) liked = state.likedPostIds.has(p.id);
-  if (liked === null || liked === undefined) {
-    const { data } = await supabase.from("post_likes").select("post_id").eq("post_id", p.id).eq("user_id", state.session.user.id).maybeSingle();
-    liked = !!data;
-  }
+  const { data: liked } = await supabase
+    .from("post_likes")
+    .select("post_id")
+    .eq("post_id", p.id)
+    .eq("user_id", state.session.user.id)
+    .maybeSingle();
   const author = p.author || {};
   const pages = Array.isArray(p.body_pages) ? p.body_pages : [];
   const type = p.post_type === "reel" ? "reel" : pages.length > 1 ? "blog" : "post";
@@ -712,11 +699,11 @@ async function postCard(p, likedOverride = null) {
   const ownActions = p.author_id === state.session.user.id
     ? `<button class="postDeleteBtn" onclick="deletePost('${p.id}')" aria-label="Delete ${kindLabel.toLowerCase()}">Delete</button>`
     : "";
-  return `<article class="postCard ${type === "reel" ? "reelCard" : ""}" data-post-id="${esc(p.id)}">
+  return `<article class="postCard ${type === "reel" ? "reelCard" : ""}">
     <div class="postHeader"><div class="postAuthor" onclick="location.hash='user?id=${p.author_id}'">${image(author.avatar_url, author.display_name || author.full_name || author.username)}<div><strong>${esc(author.display_name || author.full_name || author.username || "Developer")}</strong><small>@${esc(author.username || "")} · ${timeAgo(p.created_at)}</small></div></div><div class="postHeaderActions"><span class="postKind ${type}">${kindLabel}</span>${ownActions}</div></div>
     <h2>${esc(p.title || kindLabel)}</h2>${textContent}${blog}${postCover}${attachments}${media}
     <div class="tags">${(p.tags || []).map((t) => `<span class="tag">#${esc(t)}</span>`).join("")}</div>
-    <div class="postMeta"><button class="likeButton" data-like-button="${esc(p.id)}" aria-pressed="${!!liked}" onclick="toggleLike('${p.id}',${!!liked})">${liked ? "♥" : "♡"} ${p.like_count || 0}</button><button class="commentButton" data-comment-button="${esc(p.id)}" onclick="openComments('${p.id}')">💬 ${p.comment_count || 0}</button><button onclick="viewPost('${p.id}')">👁 ${p.view_count || 0}</button><button onclick="location.hash='user?id=${p.author_id}'">Profile</button></div>
+    <div class="postMeta"><button onclick="toggleLike('${p.id}',${!!liked})">${liked ? "♥" : "♡"} ${p.like_count || 0}</button><button onclick="openComments('${p.id}')">💬 ${p.comment_count || 0}</button><button onclick="viewPost('${p.id}')">👁 ${p.view_count || 0}</button><button onclick="location.hash='user?id=${p.author_id}'">Profile</button></div>
   </article>`;
 }
 
@@ -767,13 +754,6 @@ async function renderHome(page) {
 
   const posts = await getPosts();
   state.homeFeedPosts = posts;
-  state.likedPostIds = new Set();
-  state.likedPostIdsReady = true;
-  const homePostIds = posts.map((p) => p.id).filter(Boolean);
-  if (homePostIds.length) {
-    const { data: likedRows } = await supabase.from("post_likes").select("post_id").in("post_id", homePostIds).eq("user_id", state.session.user.id);
-    state.likedPostIds = new Set((likedRows || []).map((r) => r.post_id));
-  }
   async function paintFeed(filter = "post") {
     const list = document.querySelector("#feedList");
     if (!list) return;
@@ -789,7 +769,7 @@ async function renderHome(page) {
       const type = p.post_type === "reel" ? "reel" : pages.length > 1 ? "blog" : "post";
       return type === filter;
     });
-    list.innerHTML = visible.length ? (await Promise.all(visible.map((p) => postCard(p, state.likedPostIds.has(p.id))))).join("") : empty(`No ${label.toLowerCase()} yet`, `There are no ${label.toLowerCase()} in your feed yet.`);
+    list.innerHTML = visible.length ? (await Promise.all(visible.map(postCard))).join("") : empty(`No ${label.toLowerCase()} yet`, `There are no ${label.toLowerCase()} in your feed yet.`);
     wireBlogViewers(list);
   }
   document.querySelectorAll(".feedTab").forEach((tab) => tab.addEventListener("click", () => paintFeed(tab.dataset.feedFilter)));
@@ -797,131 +777,93 @@ async function renderHome(page) {
 }
 
 async function toggleLike(postId, liked) {
-  const button = document.querySelector(`[data-like-button="${CSS.escape(postId)}"]`);
-  const card = document.querySelector(`[data-post-id="${CSS.escape(postId)}"]`);
-  const currentCount = Number((button?.textContent || "").match(/\d+/)?.[0] || 0);
-  const nextLiked = !liked;
-  const nextCount = Math.max(0, currentCount + (nextLiked ? 1 : -1));
-  if (button) {
-    button.dataset.pending = "1";
-    button.setAttribute("aria-pressed", String(nextLiked));
-    button.textContent = `${nextLiked ? "♥" : "♡"} ${nextCount}`;
+  const post = await supabase
+    .from("posts")
+    .select("author_id,title")
+    .eq("id", postId)
+    .single();
+  if (post.error) return toast(post.error.message, "error");
+  const res = liked
+    ? await supabase
+        .from("post_likes")
+        .delete()
+        .eq("post_id", postId)
+        .eq("user_id", state.session.user.id)
+    : await supabase
+        .from("post_likes")
+        .insert({ post_id: postId, user_id: state.session.user.id });
+  if (res.error) toast(res.error.message, "error");
+  else {
+    if (state.route === "home") navigate("home");
+    else if (state.route === "user") navigate(location.hash.slice(1));
   }
-  state.likedPostIds[nextLiked ? "add" : "delete"](postId);
-  const post = await supabase.from("posts").select("author_id,title").eq("id", postId).single();
-  if (post.error) {
-    if (button) { button.setAttribute("aria-pressed", String(liked)); button.textContent = `${liked ? "♥" : "♡"} ${currentCount}`; button.dataset.pending = ""; }
-    state.likedPostIds[liked ? "add" : "delete"](postId);
-    return toast(post.error.message, "error");
-  }
-  const res = nextLiked
-    ? await supabase.from("post_likes").insert({ post_id: postId, user_id: state.session.user.id })
-    : await supabase.from("post_likes").delete().eq("post_id", postId).eq("user_id", state.session.user.id);
-  if (res.error) {
-    if (button) { button.setAttribute("aria-pressed", String(liked)); button.textContent = `${liked ? "♥" : "♡"} ${currentCount}`; button.dataset.pending = ""; }
-    state.likedPostIds[liked ? "add" : "delete"](postId);
-    return toast(res.error.message, "error");
-  }
-  if (button) button.dataset.pending = "";
-  if (card) card.dataset.likeCount = String(nextCount);
 }
 window.toggleLike = toggleLike;
 
-function renderCommentNode(c, byParent, likedSet, postId, depth = 0) {
-  const replies = byParent[c.id] || [];
-  const liked = likedSet.has(c.id);
-  const replyHtml = replies.map((r) => renderCommentNode(r, byParent, likedSet, postId, depth + 1)).join("");
-  return `<div class="comment ${depth ? "replyComment" : ""}" data-comment-id="${esc(c.id)}" data-parent-id="${esc(c.parent_id || "")}" style="margin-left:${Math.min(depth, 3) * 24}px">
-    <button class="commentAuthor" onclick="closeModal();location.hash='user?id=${c.author_id}'">${image(c.author?.avatar_url, c.author?.display_name || c.author?.full_name || c.author?.username, "avatar small")}<span><b>${esc(c.author?.display_name || c.author?.full_name || c.author?.username || "User")}</b><small>@${esc(c.author?.username || "")} · ${timeAgo(c.created_at)}</small></span></button>
-    <p>${esc(c.content)}</p>
-    <div class="commentActions"><button class="commentLikeButton" data-comment-like="${esc(c.id)}" aria-pressed="${liked}" onclick="toggleCommentLike('${c.id}',${liked},'${postId}')">${liked ? "♥" : "♡"} ${c.like_count || 0}</button><button class="replyToggleButton" data-replies-toggle="${esc(c.id)}" onclick="toggleCommentReplies('${c.id}')">Replies${replies.length ? ` (${replies.length})` : ""}</button></div>
-    <div class="commentReplies" data-comment-replies="${esc(c.id)}" hidden>${replyHtml}<button class="replyActionButton" type="button" onclick="replyToComment('${c.id}')">↩ Reply</button></div>
-  </div>`;
-}
-
 async function openComments(postId) {
-  const { data: comments, error } = await supabase.from("post_comments").select("*,author:profiles!post_comments_author_id_fkey(id,username,display_name,full_name,avatar_url)").eq("post_id", postId).order("created_at", { ascending: true });
+  const { data: comments, error } = await supabase
+    .from("post_comments")
+    .select(
+      "*,author:profiles!post_comments_author_id_fkey(id,username,display_name,full_name,avatar_url)",
+    )
+    .eq("post_id", postId)
+    .order("created_at", { ascending: true });
   if (error) return toast(error.message, "error");
-  const ids = (comments || []).map((c) => c.id).filter(Boolean);
-  const { data: likes } = ids.length ? await supabase.from("comment_likes").select("comment_id").in("comment_id", ids).eq("user_id", state.session.user.id) : { data: [] };
+  const { data: likes } = await supabase
+    .from("comment_likes")
+    .select("comment_id")
+    .in("comment_id", (comments || []).map((c) => c.id).filter(Boolean))
+    .eq("user_id", state.session.user.id);
   const likedSet = new Set((likes || []).map((x) => x.comment_id));
-  state.commentLikeIds = likedSet;
   const byParent = {};
-  (comments || []).forEach((c) => (byParent[c.parent_id || "root"] ||= []).push(c));
-  modal(`<div class="commentsModal" data-comments-modal="${esc(postId)}"><div class="commentsModalHeader"><h2>Comments</h2></div><div class="commentList" id="commentList">${(byParent.root || []).map((c) => renderCommentNode(c, byParent, likedSet, postId)).join("") || `<p class="muted">No comments yet.</p>`}</div><form id="commentForm"><label>Add a comment<textarea name="content" rows="3" required placeholder="Share your thoughts…"></textarea></label><input type="hidden" name="parentId"><div class="replyingTo hidden" id="replyingTo"></div><button class="primary full">Comment</button></form></div>`);
-  const form = document.querySelector("#commentForm");
-  form.onsubmit = async (e) => {
+  (comments || []).forEach((c) => {
+    (byParent[c.parent_id || "root"] ||= []).push(c);
+  });
+  const renderComment = (c, depth = 0) => {
+    const replies = byParent[c.id] || [];
+    return `<div class="comment ${depth ? "replyComment" : ""}" style="margin-left:${Math.min(depth, 3) * 24}px"><button class="commentAuthor" onclick="closeModal();location.hash='user?id=${c.author_id}'">${image(c.author?.avatar_url, c.author?.display_name || c.author?.full_name || c.author?.username, "avatar small")}<span><b>${esc(c.author?.display_name || c.author?.full_name || c.author?.username)}</b><small>@${esc(c.author?.username || "")} · ${timeAgo(c.created_at)}</small></span></button><p>${esc(c.content)}</p><div class="commentActions"><button onclick="toggleCommentLike('${c.id}',${likedSet.has(c.id)},'${postId}')">${likedSet.has(c.id) ? "♥" : "♡"} ${c.like_count || 0}</button><button onclick="replyToComment('${c.id}')">↩ Reply</button></div>${replies.map((r) => renderComment(r, depth + 1)).join("")}</div>`;
+  };
+  modal(
+    `<h2>Comments</h2><div class="commentList">${(byParent.root || []).map((c) => renderComment(c)).join("") || `<p class="muted">No comments yet.</p>`}</div><form id="commentForm"><label>Add a comment<textarea name="content" rows="3" required></textarea></label><input type="hidden" name="parentId"><button class="primary full">Comment</button></form>`,
+  );
+  document.querySelector("#commentForm").onsubmit = async (e) => {
     e.preventDefault();
-    const f = new FormData(form);
-    const content = String(f.get("content") || "").trim();
+    const f = new FormData(e.target);
+    const content = String(f.get("content")).trim();
     const parentId = f.get("parentId") || null;
-    if (!content) return;
-    const submit = form.querySelector("button[type=submit]");
-    if (submit) { submit.disabled = true; submit.textContent = "Posting…"; }
-    const { data: inserted, error: insertError } = await supabase.from("post_comments").insert({ post_id: postId, author_id: state.session.user.id, parent_id: parentId, content }).select("*,author:profiles!post_comments_author_id_fkey(id,username,display_name,full_name,avatar_url)").single();
-    if (insertError) { if (submit) { submit.disabled = false; submit.textContent = "Comment"; } return toast(insertError.message, "error"); }
-    const list = document.querySelector("#commentList");
-    list?.querySelector(".muted")?.remove();
-    if (parentId) {
-      const parentReplies = list?.querySelector(`[data-comment-replies="${CSS.escape(parentId)}"]`);
-      if (parentReplies) {
-        parentReplies.hidden = false;
-        const replyButton = parentReplies.querySelector(".replyActionButton");
-        replyButton?.insertAdjacentHTML("beforebegin", renderCommentNode(inserted, { root: [], [parentId]: [] }, new Set(), postId, 1));
-        const toggle = document.querySelector(`[data-replies-toggle="${CSS.escape(parentId)}"]`);
-        if (toggle) { const n = (toggle.textContent.match(/\d+/) || ["0"])[0] * 1 + 1; toggle.textContent = `Replies (${n})`; }
-      }
-    } else if (list) {
-      list.insertAdjacentHTML("beforeend", renderCommentNode(inserted, { root: [], [inserted.id]: [] }, new Set(), postId));
+    const { error } = await supabase
+      .from("post_comments")
+      .insert({
+        post_id: postId,
+        author_id: state.session.user.id,
+        parent_id: parentId,
+        content,
+      });
+    if (error) toast(error.message, "error");
+    else {
+      closeModal();
+      toast(parentId ? "Reply added." : "Comment added.", "success");
+      await openComments(postId);
     }
-    const postCommentButton = document.querySelector(`[data-comment-button="${CSS.escape(postId)}"]`);
-    if (postCommentButton) {
-      const count = Number((postCommentButton.textContent || "").match(/\d+/)?.[0] || 0) + 1;
-      postCommentButton.textContent = `💬 ${count}`;
-    }
-    form.reset();
-    form.querySelector('input[name="parentId"]').value = "";
-    document.querySelector("#replyingTo")?.classList.add("hidden");
-    if (submit) { submit.disabled = false; submit.textContent = "Comment"; }
   };
 }
-
-function toggleCommentReplies(commentId) {
-  const root = document.querySelector(`[data-comment-id="${CSS.escape(commentId)}"]`);
-  const replies = root?.querySelector(`[data-comment-replies="${CSS.escape(commentId)}"]`);
-  const button = root?.querySelector(`[data-replies-toggle="${CSS.escape(commentId)}"]`);
-  if (!replies) return;
-  replies.hidden = !replies.hidden;
-  if (button) button.setAttribute("aria-expanded", String(!replies.hidden));
-}
-window.toggleCommentReplies = toggleCommentReplies;
-
 async function toggleCommentLike(commentId, liked, postId) {
-  const button = document.querySelector(`[data-comment-like="${CSS.escape(commentId)}"]`);
-  const currentCount = Number((button?.textContent || "").match(/\d+/)?.[0] || 0);
-  const nextLiked = !liked;
-  if (button) {
-    button.setAttribute("aria-pressed", String(nextLiked));
-    button.textContent = `${nextLiked ? "♥" : "♡"} ${Math.max(0, currentCount + (nextLiked ? 1 : -1))}`;
-    button.dataset.pending = "1";
-  }
-  state.commentLikeIds[nextLiked ? "add" : "delete"](commentId);
-  const res = nextLiked
-    ? await supabase.from("comment_likes").insert({ comment_id: commentId, user_id: state.session.user.id })
-    : await supabase.from("comment_likes").delete().eq("comment_id", commentId).eq("user_id", state.session.user.id);
-  if (res.error) {
-    state.commentLikeIds[liked ? "add" : "delete"](commentId);
-    if (button) { button.setAttribute("aria-pressed", String(liked)); button.textContent = `${liked ? "♥" : "♡"} ${currentCount}`; }
-    return toast(res.error.message, "error");
-  }
-  if (button) button.dataset.pending = "";
+  const res = liked
+    ? await supabase
+        .from("comment_likes")
+        .delete()
+        .eq("comment_id", commentId)
+        .eq("user_id", state.session.user.id)
+    : await supabase
+        .from("comment_likes")
+        .insert({ comment_id: commentId, user_id: state.session.user.id });
+  if (res.error) toast(res.error.message, "error");
+  else openComments(postId);
 }
 window.toggleCommentLike = toggleCommentLike;
 function replyToComment(commentId) {
   const input = document.querySelector('#commentForm input[name="parentId"]');
-  const notice = document.querySelector("#replyingTo");
   if (input) input.value = commentId;
-  if (notice) { notice.textContent = "Replying to this comment"; notice.classList.remove("hidden"); }
   document.querySelector("#commentForm textarea")?.focus();
 }
 window.replyToComment = replyToComment;
@@ -930,6 +872,7 @@ async function viewPost(id) {
   await supabase.rpc("record_post_view", { post_id_input: id });
 }
 window.viewPost = viewPost;
+
 async function renderSearch(page, q = "", type = "posts") {
   const safeType = ["posts", "developers", "reels"].includes(type) ? type : "posts";
   const like = q
@@ -1254,6 +1197,20 @@ async function renderProfile(page, id) {
       .select("id", { count: "exact", head: true })
       .eq("author_id", id),
     supabase
+      .from("follows")
+      .select(
+        "follower_id,user:profiles!follows_follower_id_fkey(id,username,display_name,full_name,avatar_url)",
+      )
+      .eq("following_id", id)
+      .limit(100),
+    supabase
+      .from("follows")
+      .select(
+        "following_id,user:profiles!follows_following_id_fkey(id,username,display_name,full_name,avatar_url)",
+      )
+      .eq("follower_id", id)
+      .limit(100),
+    supabase
       .from("projects")
       .select("*,community:communities(id,name,logo_url)")
       .eq("owner_id", id)
@@ -1268,6 +1225,8 @@ async function renderProfile(page, id) {
     followersQ,
     followingQ,
     postsQ,
+    followerRows,
+    followingRows,
     projects,
     memberRows,
     posts,
@@ -1276,6 +1235,8 @@ async function renderProfile(page, id) {
     followersQ,
     followingQ,
     postsQ,
+    followerRows,
+    followingRows,
     projects,
     memberRows,
   ].find((r) => r?.error)?.error;
@@ -1284,24 +1245,6 @@ async function renderProfile(page, id) {
   const followers = followersQ.count || 0,
     following = followingQ.count || 0,
     postCount = postsQ.count || 0;
-
-  // Profile content is grouped into the same three publishing types used by Home.
-  // A one-page item is a Post, a multi-page item is a Blog, and an explicit reel is a Reel.
-  const classifyProfileContent = (items) => {
-    const grouped = { post: [], blog: [], reel: [] };
-    (items || []).forEach((item) => {
-      const pages = Array.isArray(item.body_pages) ? item.body_pages : [];
-      const type = item.post_type === "reel" ? "reel" : pages.length > 1 ? "blog" : "post";
-      grouped[type].push(item);
-    });
-    return grouped;
-  };
-  const profileContent = classifyProfileContent(posts);
-  const renderProfileCards = async (items, emptyTitle, emptyText) =>
-    (await Promise.all((items || []).map(postCard))).join("") || empty(emptyTitle, emptyText);
-  const profilePostCards = await renderProfileCards(profileContent.post, "No posts yet", "This developer has not published a one-page post.");
-  const profileBlogCards = await renderProfileCards(profileContent.blog, "No blogs yet", "This developer has not published a multi-page blog.");
-  const profileReelCards = await renderProfileCards(profileContent.reel, "No reels yet", "This developer has not published a reel.");
   const own = id === state.session.user.id;
   let isFollowing = false;
   if (!own) {
@@ -1313,42 +1256,22 @@ async function renderProfile(page, id) {
       .maybeSingle();
     isFollowing = !!data;
   }
-  page.innerHTML = `<section class="profileHeader"><div class="profileAvatarWrap">${image(p.avatar_url, p.display_name || p.full_name || p.username, "profileAvatar")}</div><div class="profileIdentity"><div class="eyebrow">@${esc(p.username)}</div><h1>${esc(p.display_name || p.full_name || "Developer")}</h1><p>${esc(p.bio || "Building things and solving problems.")}</p>${p.location ? `<div class="profileLocation">⌖ ${esc(p.location)}</div>` : ""}<div class="profileStats"><button onclick="openPeopleList('${id}','followers')"><b>${followers}</b><span>followers</span></button><button onclick="openPeopleList('${id}','following')"><b>${following}</b><span>following</span></button><span><b>${postCount}</b><span>posts</span></span></div></div><div class="profileActions">${own ? `<button class="primary" onclick="openProfileModal()">Edit profile</button>` : `<button class="${isFollowing ? "secondary" : "primary"}" onclick="toggleFollow('${id}',${isFollowing})">${isFollowing ? "Unfollow" : "Follow"}</button><button class="secondary" onclick="messageUser('${id}')">Message</button>`}</div></section><div class="profileGrid"><section><div class="card"><h2>About</h2><p>${esc(p.bio || "No bio yet.")}</p>${p.location ? `<p class="profileLocation">⌖ ${esc(p.location)}</p>` : ""}<h3>Skills</h3><div class="tags">${(p.skills || []).map((s) => `<span class="tag">${esc(s)}</span>`).join("") || "<span class='muted'>No skills listed.</span>"}</div></div><div class="card"><div class="sectionTitle"><h2>Projects</h2>${own ? `<button class="secondary" onclick="openProjectModal()">+ Add project</button>` : ""}</div><div class="projectList">${(projects.data || []).map(projectCard).join("") || `<p class="muted">${own ? "Add your projects here." : "No projects added yet."}</p>`}</div></div><div class="card profileContentCard">
-  <div class="profileContentTabs" role="tablist" aria-label="Profile content">
-    <button class="profileContentTab active" type="button" role="tab" aria-selected="true" data-profile-content="post" onclick="switchProfileContent('post')">Posts</button>
-    <button class="profileContentTab" type="button" role="tab" aria-selected="false" data-profile-content="blog" onclick="switchProfileContent('blog')">Blogs</button>
-    <button class="profileContentTab" type="button" role="tab" aria-selected="false" data-profile-content="reel" onclick="switchProfileContent('reel')">Reels</button>
-  </div>
-  <div class="profileContentPanel" data-profile-panel="post">${profilePostCards}</div>
-  <div class="profileContentPanel hidden" data-profile-panel="blog">${profileBlogCards}</div>
-  <div class="profileContentPanel hidden" data-profile-panel="reel">${profileReelCards}</div>
-</div></section><aside><div class="card"><h3>Communities & projects</h3><div class="peopleList">${(memberRows.data || []).map((x) => (x.community ? `<button class="memberRow" onclick="location.hash='community?id=${x.community.id}'">${image(x.community.logo_url, x.community.name, "avatar")}<span><b>${esc(x.community.name)}</b><small>Joined community</small></span></button>` : " ")).join("") || `<p class="muted">No community links yet.</p>`}</div></div><div class="card"><h3>Links</h3>${linkLine("GitHub", p.github_url)}${linkLine("LinkedIn", p.linkedin_url)}${linkLine("Portfolio", p.portfolio_url)}${linkLine("Website", p.website_url)}</div></aside></div>`;
+  page.innerHTML = `<section class="profileHeader"><div class="profileAvatarWrap">${image(p.avatar_url, p.display_name || p.full_name || p.username, "profileAvatar")}</div><div class="profileIdentity"><div class="eyebrow">@${esc(p.username)}</div><h1>${esc(p.display_name || p.full_name || "Developer")}</h1><p>${esc(p.bio || "Building things and solving problems.")}</p>${p.location ? `<div class="profileLocation">⌖ ${esc(p.location)}</div>` : ""}<div class="profileStats"><button onclick="openPeopleList('${id}','followers')"><b>${followers}</b><span>followers</span></button><button onclick="openPeopleList('${id}','following')"><b>${following}</b><span>following</span></button><span><b>${postCount}</b><span>posts</span></span></div></div><div class="profileActions">${own ? `<button class="primary" onclick="openProfileModal()">Edit profile</button>` : `<button class="${isFollowing ? "secondary" : "primary"}" onclick="toggleFollow('${id}',${isFollowing})">${isFollowing ? "Unfollow" : "Follow"}</button><button class="secondary" onclick="messageUser('${id}')">Message</button>`}</div></section><div class="profileGrid"><section><div class="card"><h2>About</h2><p>${esc(p.bio || "No bio yet.")}</p>${p.location ? `<p class="profileLocation">⌖ ${esc(p.location)}</p>` : ""}<h3>Skills</h3><div class="tags">${(p.skills || []).map((s) => `<span class="tag">${esc(s)}</span>`).join("") || "<span class='muted'>No skills listed.</span>"}</div></div><div class="card"><div class="sectionTitle"><h2>Projects</h2>${own ? `<button class="secondary" onclick="openProjectModal()">+ Add project</button>` : ""}</div><div class="projectList">${(projects.data || []).map(projectCard).join("") || `<p class="muted">${own ? "Add your projects here." : "No projects added yet."}</p>`}</div></div><div class="card"><h2>Posts</h2><div class="profilePosts">${(await Promise.all((posts || []).map(postCard))).join("") || empty("No posts yet", "This developer has not posted anything.")}</div></div></section><aside><div class="card"><h3>Following (${following})</h3><div class="peopleList">${
+    (followingRows.data || [])
+      .slice(0, 12)
+      .map((row) => personRow(row.user))
+      .join("") || `<p class="muted">Not following anyone yet.</p>`
+  }</div>${following > 12 ? `<button class="linkButton" onclick="openPeopleList('${id}','following')">See all following</button>` : ""}</div><div class="card"><h3>Followers (${followers})</h3><div class="peopleList">${
+    (followerRows.data || [])
+      .slice(0, 12)
+      .map((row) => personRow(row.user))
+      .join("") || `<p class="muted">No followers yet.</p>`
+  }</div>${followers > 12 ? `<button class="linkButton" onclick="openPeopleList('${id}','followers')">See all followers</button>` : ""}</div><div class="card"><h3>Communities & projects</h3><div class="peopleList">${(memberRows.data || []).map((x) => (x.community ? `<button class="memberRow" onclick="location.hash='community?id=${x.community.id}'">${image(x.community.logo_url, x.community.name, "avatar")}<span><b>${esc(x.community.name)}</b><small>Joined community</small></span></button>` : " ")).join("") || `<p class="muted">No community links yet.</p>`}</div></div><div class="card"><h3>Links</h3>${linkLine("GitHub", p.github_url)}${linkLine("LinkedIn", p.linkedin_url)}${linkLine("Portfolio", p.portfolio_url)}${linkLine("Website", p.website_url)}</div></aside></div>`;
 }
-function switchProfileContent(type = "post") {
-  const allowed = new Set(["post", "blog", "reel"]);
-  if (!allowed.has(type)) type = "post";
-  document.querySelectorAll("[data-profile-content]").forEach((tab) => {
-    const active = tab.dataset.profileContent === type;
-    tab.classList.toggle("active", active);
-    tab.setAttribute("aria-selected", active ? "true" : "false");
-  });
-  document.querySelectorAll("[data-profile-panel]").forEach((panel) => {
-    panel.classList.toggle("hidden", panel.dataset.profilePanel !== type);
-  });
-}
-window.switchProfileContent = switchProfileContent;
-
-function personRow(u, isFollowing = false) {
-  if (!u) return "";
-  const name = u.display_name || u.full_name || u.username || "Developer";
-  const safeFollowing = !!isFollowing;
-  return `<div class="memberRow personRow" data-user-id="${u.id}">
-    <button class="personRowIdentity" type="button" onclick="location.hash='user?id=${u.id}'">
-      ${image(u.avatar_url, name)}
-      <span><b>${esc(name)}</b><small>@${esc(u.username || "")}</small></span>
-    </button>
-    ${u.id !== state.session.user.id ? `<button type="button" class="personFollowBtn ${safeFollowing ? "secondary" : "primary"}" data-following="${safeFollowing ? "true" : "false"}" onclick="event.stopPropagation(); toggleFollowInPlace('${u.id}', this)">${safeFollowing ? "Unfollow" : "Follow"}</button>` : ""}
-  </div>`;
+function personRow(u) {
+  return u
+    ? `<button class="memberRow" onclick="location.hash='user?id=${u.id}'">${image(u.avatar_url, u.display_name || u.full_name || u.username)}<span><b>${esc(u.display_name || u.full_name || u.username)}</b><small>@${esc(u.username)}</small></span></button>`
+    : "";
 }
 function projectCard(x) {
   return `<div class="projectCard"><div><h3>${esc(x.name)}</h3><p>${esc(x.description || "")}</p><div class="tags">${(x.technologies || []).map((t) => `<span class="tag">${esc(t)}</span>`).join("")}</div>${x.community ? `<button class="communityLink" onclick="location.hash='community?id=${x.community.id}'">${esc(x.community.name)}</button>` : ""}</div>${x.url ? `<a target="_blank" rel="noreferrer" href="${esc(x.url)}">Open</a>` : ""}</div>`;
@@ -1362,58 +1285,18 @@ function linkLine(label, url) {
 async function openPeopleList(userId, type) {
   const col = type === "followers" ? "follower_id" : "following_id",
     match = type === "followers" ? "following_id" : "follower_id";
-  const { data, error } = await supabase
+  const { data } = await supabase
     .from("follows")
     .select(
-      `${col},created_at,user:profiles!follows_${col}_fkey(id,username,display_name,full_name,avatar_url)`,
+      `${col},user:profiles!follows_${col}_fkey(id,username,display_name,full_name,avatar_url)`,
     )
     .eq(match, userId)
     .order("created_at", { ascending: false });
-  if (error) return toast(error.message, "error");
-
-  const people = (data || []).map((x) => x.user).filter(Boolean);
-  let followingIds = new Set();
-  if (people.length && state.session?.user?.id) {
-    const { data: mine } = await supabase
-      .from("follows")
-      .select("following_id")
-      .eq("follower_id", state.session.user.id)
-      .in("following_id", people.map((u) => u.id));
-    followingIds = new Set((mine || []).map((x) => x.following_id));
-  }
-
   modal(
-    `<h2>${type === "followers" ? "Followers" : "Following"}</h2><div class="peopleList">${people.map((u) => personRow(u, followingIds.has(u.id))).join("") || `<p class="muted">No ${type} yet.</p>`}</div>`,
+    `<h2>${type === "followers" ? "Followers" : "Following"}</h2><div class="peopleList">${(data || []).map((x) => personRow(x.user)).join("") || `<p class="muted">No ${type} yet.</p>`}</div>`,
   );
 }
 window.openPeopleList = openPeopleList;
-
-async function toggleFollowInPlace(id, button) {
-  if (!id || id === state.session.user.id || button.disabled) return;
-  const currentlyFollowing = button.dataset.following === "true";
-  const previousText = button.textContent;
-  button.disabled = true;
-  button.textContent = currentlyFollowing ? "Unfollowing…" : "Following…";
-  try {
-    const action = currentlyFollowing
-      ? supabase.from("follows").delete().eq("follower_id", state.session.user.id).eq("following_id", id)
-      : supabase.from("follows").insert({ follower_id: state.session.user.id, following_id: id });
-    const { error } = await action;
-    if (error) throw error;
-    const next = !currentlyFollowing;
-    button.dataset.following = next ? "true" : "false";
-    button.textContent = next ? "Unfollow" : "Follow";
-    button.classList.toggle("primary", !next);
-    button.classList.toggle("secondary", next);
-    toast(next ? "Following." : "Unfollowed.", "success");
-  } catch (err) {
-    button.textContent = previousText;
-    toast(err.message || "Could not update follow status.", "error");
-  } finally {
-    button.disabled = false;
-  }
-}
-window.toggleFollowInPlace = toggleFollowInPlace;
 
 async function toggleFollow(id, following) {
   const action = following
@@ -2359,9 +2242,7 @@ window.deleteCommunityChannel = async function (event, communityId, channelId) {
 
 async function renderNotifications(page) {
   await loadNotifications();
-  const visibleCount = state.notificationVisibleCount || 10;
-  const visible = state.notifications.slice(0, visibleCount);
-  page.innerHTML = `<div class="pageHead"><div><div class="eyebrow">NOTIFICATIONS</div><h1>Activity</h1><p>Recent activity first. Older notifications are available with More.</p></div><button class="secondary" id="readAll">Mark all read</button></div><div class="notificationList">${visible.length ? visible.map((n) => `<button class="notification ${n.is_read ? "" : "unread"}" onclick="markNotification('${n.id}')">${image(n.actor?.avatar_url, n.actor?.display_name || n.actor?.username)}<span><p>${esc(n.message)}</p><small>${timeAgo(n.created_at)}</small></span></button>`).join("") : empty("You're all caught up", "New activity will appear here.")}</div>${state.notifications.length > visibleCount ? `<div class="notificationMoreWrap"><button class="secondary" id="moreNotifications">More notifications</button></div>` : ""}`;
+  page.innerHTML = `<div class="pageHead"><div><div class="eyebrow">NOTIFICATIONS</div><h1>Activity</h1><p>Likes, comments, follows, messages and community activity.</p></div><button class="secondary" id="readAll">Mark all read</button></div><div class="notificationList">${state.notifications.length ? state.notifications.map((n) => `<button class="notification ${n.is_read ? "" : "unread"}" onclick="markNotification('${n.id}')">${image(n.actor?.avatar_url, n.actor?.display_name || n.actor?.username)}<span><p>${esc(n.message)}</p><small>${timeAgo(n.created_at)}</small></span></button>`).join("") : empty("You're all caught up", "New activity will appear here.")}</div>`;
   document.querySelector("#readAll").onclick = async () => {
     await supabase
       .from("notifications")
@@ -2370,11 +2251,6 @@ async function renderNotifications(page) {
     await loadNotifications();
     renderShell();
     navigate("notifications");
-  };
-  const more = document.querySelector("#moreNotifications");
-  if (more) more.onclick = () => {
-    state.notificationVisibleCount = Math.min(state.notifications.length, visibleCount + 10);
-    renderNotifications(page);
   };
 }
 async function loadNotifications() {
@@ -2385,7 +2261,7 @@ async function loadNotifications() {
     )
     .eq("recipient_id", state.session.user.id)
     .order("created_at", { ascending: false })
-    .limit(1000);
+    .limit(100);
   state.notifications = data || [];
 }
 const unreadNotificationCount = () =>
@@ -3075,23 +2951,14 @@ function subscribeRealtime() {
           .maybeSingle();
         if (!follow) return;
         state.feedPriorityIds = [...new Set([...(state.feedPriorityIds || []), p.new.id])];
-        // Do not reload the whole feed. The new followed post will appear on the next refresh.
-        const feed = document.querySelector("#feedList");
-        if (feed && !feed.querySelector(`[data-post-id="${CSS.escape(p.new.id)}"]`)) {
-          const notice = document.createElement("div");
-          notice.className = "newContentNotice";
-          notice.textContent = "New post from someone you follow — refresh to view";
-          feed.prepend(notice);
-        }
+        await renderHome(document.querySelector("#page"));
       },
     )
     .on(
       "postgres_changes",
-      { event: "INSERT", schema: "public", table: "post_comments" },
-      async (p) => {
-        // Comments are updated locally; never reload the home page for a comment event.
-        const postId = p.new?.post_id;
-        if (!postId || !document.querySelector(`[data-comment-button="${CSS.escape(postId)}"]`)) return;
+      { event: "*", schema: "public", table: "post_comments" },
+      async () => {
+        if (state.route === "home") navigate("home");
       },
     )
     .subscribe();
