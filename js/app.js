@@ -14,6 +14,7 @@ const state = {
   route: "home",
   selectedConversation: null,
   notifications: [],
+  notificationVisibleCount: 10,
   searchTimer: null,
   realtime: null,
   selectedCommunityChannel: null,
@@ -22,6 +23,11 @@ const state = {
   ),
   messageDrafts: {},
   publicAuthMode: "login",
+  feedPriorityIds: [],
+  homeFeedPosts: [],
+  likedPostIds: new Set(),
+  commentLikeIds: new Set(),
+  likedPostIdsReady: false,
 };
 
 const app = document.querySelector("#app");
@@ -440,7 +446,7 @@ function renderShell() {
     state.profile?.full_name ||
     state.profile?.username ||
     "Developer";
-  app.innerHTML = `<div class="layout"><aside class="sidebar"><div class="brand" onclick="location.hash='home'"><img class="brandLogo" src="assets/live-coders-logo.svg" alt=""><div class="brandText"><strong>Live Coders</strong><small>Build • Ask • Connect</small></div></div><nav>${navItem("home", "⌂", "Home")}${navItem("explore", "⌕", "Explore")}${navItem("communities", "◈", "Communities")}${navItem("myCommunities", "▣", "My Communities")}${navItem("messages", "✉", "Messages")}${navItem("notifications", "●", "Notifications", unreadNotificationCount())}${navItem("profile", "◎", "Profile")}${navItem("settings", "⚙", "Settings")}</nav><div class="sidebarBottom"><button class="ghost full" id="logoutBtn">Log out</button></div></aside><div class="mainArea"><header class="topbar"><div class="mobileBrand"><img class="brandLogo small" src="assets/live-coders-logo.svg" alt=""><strong>Live Coders</strong></div><div class="globalSearch"><span>⌕</span><input id="globalSearch" value="${esc(new URLSearchParams(location.hash.split("?")[1] || "").get("q") || "")}" placeholder="Search developers, posts, communities…"></div><div class="topActions"><button class="notificationBtn" onclick="location.hash='notifications'" aria-label="Notifications" title="Notifications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M10 21h4"></path></svg><b id="notifBadge" class="notificationBadge ${unreadNotificationCount() ? "" : "hidden"}">${unreadNotificationCount()}</b></button><button class="primary" onclick="openPostModal()">+ Create Post</button><button class="topProfile" id="topProfileBtn" aria-label="Open profile">${image(avatar, display, "avatar small")}<span><strong>${esc(display)}</strong><small>@${esc(state.profile?.username || "")}</small></span><span>⌄</span></button><div class="profileMenu hidden" id="profileMenu"><button onclick="location.hash='profile'">View profile</button><button onclick="location.hash='settings'">Settings</button><button id="menuLogout">Log out</button></div></div></header><main id="page"></main></div></div>`;
+  app.innerHTML = `<div class="layout"><aside class="sidebar"><div class="brand" onclick="location.hash='home'"><img class="brandLogo" src="assets/live-coders-logo.svg" alt=""><div class="brandText"><strong>Live Coders</strong><small>Build • Ask • Connect</small></div></div><nav>${navItem("home", "⌂", "Home")}${navItem("explore", "⌕", "Explore")}${navItem("communities", "◈", "Communities")}${navItem("myCommunities", "▣", "My Communities")}${navItem("messages", "✉", "Messages")}${navItem("notifications", "●", "Notifications", unreadNotificationCount())}${navItem("profile", "◎", "Profile")}${navItem("settings", "⚙", "Settings")}</nav><div class="sidebarBottom"><button class="ghost full" id="logoutBtn">Log out</button></div></aside><div class="mainArea"><header class="topbar"><div class="mobileBrand"><img class="brandLogo small" src="assets/live-coders-logo.svg" alt=""><strong>Live Coders</strong></div><div class="globalSearch"><span>⌕</span><input id="globalSearch" value="${esc(new URLSearchParams(location.hash.split("?")[1] || "").get("q") || "")}" placeholder="Search developers, posts, reels…"></div><div class="topActions"><button class="notificationBtn" onclick="location.hash='notifications'" aria-label="Notifications" title="Notifications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M10 21h4"></path></svg><b id="notifBadge" class="notificationBadge ${unreadNotificationCount() ? "" : "hidden"}">${unreadNotificationCount()}</b></button><button class="primary" onclick="openPostModal()">+ Create Post</button><button class="topProfile" id="topProfileBtn" aria-label="Open profile">${image(avatar, display, "avatar small")}<span><strong>${esc(display)}</strong><small>@${esc(state.profile?.username || "")}</small></span><span>⌄</span></button><div class="profileMenu hidden" id="profileMenu"><button onclick="location.hash='profile'">View profile</button><button onclick="location.hash='settings'">Settings</button><button id="menuLogout">Log out</button></div></div></header><main id="page"></main></div></div>`;
   document.querySelector("#logoutBtn").onclick = () => supabase.auth.signOut();
   document.querySelector("#menuLogout").onclick = () => supabase.auth.signOut();
   document.querySelector("#topProfileBtn").onclick = () =>
@@ -461,8 +467,19 @@ function renderShell() {
     const q = search.value.trim();
     state.searchTimer = setTimeout(() => {
       if (q) trackInterest("search", q);
-      location.hash = q ? `explore?q=${encodeURIComponent(q)}` : "explore";
+      location.hash = q
+        ? `search?q=${encodeURIComponent(q)}&type=posts`
+        : "search";
     }, 180);
+  };
+  search.onkeydown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const q = search.value.trim();
+      location.hash = q
+        ? `search?q=${encodeURIComponent(q)}&type=posts`
+        : "search";
+    }
   };
 }
 async function navigate(raw) {
@@ -478,6 +495,12 @@ async function navigate(raw) {
   const query = new URLSearchParams(raw.split("?")[1] || "");
   try {
     if (state.route === "home") await renderHome(page);
+    else if (state.route === "search")
+      await renderSearch(
+        page,
+        query.get("q") || "",
+        query.get("type") || "posts",
+      );
     else if (state.route === "create")
       await renderCreate(page, query.get("mode") || "post");
     else if (state.route === "explore")
@@ -541,37 +564,64 @@ async function getPosts(filter = {}) {
       "*,author:profiles!posts_author_id_fkey(id,username,display_name,full_name,avatar_url)",
     )
     .order("created_at", { ascending: false })
-    .limit(80);
+    .limit(100);
   if (filter.author) q = q.eq("author_id", filter.author);
   const { data, error } = await q;
   if (error) throw error;
-  const posts = data || [];
-  let friendIds = new Set();
-  if (!filter.author) {
-    const [{ data: following }, { data: followers }] = await Promise.all([
-      supabase
-        .from("follows")
-        .select("following_id")
-        .eq("follower_id", state.session.user.id)
-        .limit(300),
-      supabase
-        .from("follows")
-        .select("follower_id")
-        .eq("following_id", state.session.user.id)
-        .limit(300),
-    ]);
+  let posts = data || [];
+
+  if (!filter.author && state.session?.user?.id) {
+    // Keep followed creators' newest content visible even when recommendation ranking changes.
+    const { data: following } = await supabase
+      .from("follows")
+      .select("following_id")
+      .eq("follower_id", state.session.user.id)
+      .limit(500);
     const followingIds = new Set((following || []).map((x) => x.following_id));
-    (followers || []).forEach((x) => {
-      if (followingIds.has(x.follower_id)) friendIds.add(x.follower_id);
+    const missingFollowingIds = [...followingIds].filter(
+      (id) => !posts.some((p) => p.author_id === id),
+    );
+    if (missingFollowingIds.length) {
+      const { data: followedPosts } = await supabase
+        .from("posts")
+        .select(
+          "*,author:profiles!posts_author_id_fkey(id,username,display_name,full_name,avatar_url)",
+        )
+        .in("author_id", missingFollowingIds)
+        .order("created_at", { ascending: false })
+        .limit(100);
+      const map = new Map(posts.map((p) => [p.id, p]));
+      (followedPosts || []).forEach((p) => map.set(p.id, p));
+      posts = [...map.values()];
+    }
+
+    const freshFollowed = posts
+      .filter((p) => followingIds.has(p.author_id))
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    // Posts from people the user follows are always surfaced first for this page load.
+    const priorityIds = new Set([
+      ...(state.feedPriorityIds || []),
+      ...freshFollowed.slice(0, 20).map((p) => p.id),
+    ]);
+    state.feedPriorityIds = [...priorityIds];
+
+    return posts.sort((a, b) => {
+      const ap = priorityIds.has(a.id) ? 1000 : 0;
+      const bp = priorityIds.has(b.id) ? 1000 : 0;
+      const score = (p) =>
+        recommendationScore(p) +
+        engagementScore(p) +
+        (followingIds.has(p.author_id) ? 16 : 0);
+      return bp + score(b) - (ap + score(a));
     });
   }
-  return posts.sort((a, b) => {
-    const score = (p) =>
-      recommendationScore(p) +
-      engagementScore(p) +
-      (friendIds.has(p.author_id) ? 16 : 0);
-    return score(b) - score(a);
-  });
+
+  return posts.sort(
+    (a, b) =>
+      recommendationScore(b) +
+      engagementScore(b) -
+      (recommendationScore(a) + engagementScore(a)),
+  );
 }
 
 function renderBlogGallery(pages = [], title = "") {
@@ -586,20 +636,26 @@ function renderBlogGallery(pages = [], title = "") {
       const text = typeof page === "string" ? page : String(page?.text || "");
       return `<section class="blogPage" data-blog-page="${i}" ${i ? "hidden" : ""}>
       <div class="blogPageHeader"><span class="pageNo">Page ${i + 1} / ${pages.length}</span></div>
-      ${text ? `<p>${esc(text)}</p>` : ""}
-      ${imgs.length ? `<div class="blogImageStrip">${imgs.map((src, j) => `<img loading="lazy" src="${esc(src)}" alt="${esc(title || "Blog image")} ${j + 1}">`).join("")}</div>` : ""}
+      <div class="blogPageFrame">
+        ${text ? `<p>${esc(text)}</p>` : ""}
+        ${imgs.length ? `<div class="blogImageStrip">${imgs.map((src, j) => `<img loading="lazy" src="${esc(src)}" alt="${esc(title || "Blog image")} ${j + 1}">`).join("")}</div>` : ""}
+      </div>
     </section>`;
     })
     .join("");
   return `<div class="blogViewer" data-blog-viewer>
-    ${cover}
-    <div class="blogPages">${pageSlides}</div>
+    <div class="blogViewport">
+      ${cover}
+      <div class="blogPages">${pageSlides}</div>
+    </div>
     ${pages.length > 1 ? `<div class="blogPagerControls"><button type="button" class="secondary" data-blog-prev disabled>← Previous</button><span data-blog-counter>Page 1 / ${pages.length}</span><button type="button" class="secondary" data-blog-next>Next →</button></div>` : ""}
   </div>`;
 }
 
 function wireBlogViewers(root = document) {
   root.querySelectorAll("[data-blog-viewer]").forEach((viewer) => {
+    if (viewer.dataset.wired === "1") return;
+    viewer.dataset.wired = "1";
     const pages = [...viewer.querySelectorAll("[data-blog-page]")];
     if (pages.length < 2) return;
     let index = 0;
@@ -614,13 +670,15 @@ function wireBlogViewers(root = document) {
       if (prev) prev.disabled = index === 0;
       if (next) next.disabled = index === pages.length - 1;
     };
-    prev?.addEventListener("click", () => {
+    prev?.addEventListener("click", (e) => {
+      e.preventDefault();
       if (index > 0) {
         index--;
         paint();
       }
     });
-    next?.addEventListener("click", () => {
+    next?.addEventListener("click", (e) => {
+      e.preventDefault();
       if (index < pages.length - 1) {
         index++;
         paint();
@@ -648,18 +706,43 @@ function wireBlogViewers(root = document) {
       },
       { passive: true },
     );
+    paint();
   });
 }
 
-async function postCard(p) {
+function renderPostText(text = "", postId = "") {
+  const value = String(text || "").trim();
+  if (!value) return "";
+  const limit = 320;
+  if (value.length <= limit) return `<p class="postContent">${esc(value)}</p>`;
+  const shortId = `postText-${String(postId).replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  const excerpt = value.slice(0, limit).trimEnd();
+  return `<div class="postTextWrap" id="${shortId}"><p class="postContent postExcerpt">${esc(excerpt)}… <button type="button" class="readMoreBtn" onclick="togglePostText('${shortId}')">Read more</button></p><p class="postContent postFullText hidden">${esc(value)} <button type="button" class="readMoreBtn" onclick="togglePostText('${shortId}')">Show less</button></p></div>`;
+}
+
+function togglePostText(id) {
+  const root = document.getElementById(id);
+  if (!root) return;
+  root.querySelector(".postExcerpt")?.classList.toggle("hidden");
+  root.querySelector(".postFullText")?.classList.toggle("hidden");
+}
+window.togglePostText = togglePostText;
+
+async function postCard(p, likedOverride = null) {
   trackInterest("category", p.category || "");
   (p.tags || []).slice(0, 5).forEach((t) => trackInterest("topic", t));
-  const { data: liked } = await supabase
-    .from("post_likes")
-    .select("post_id")
-    .eq("post_id", p.id)
-    .eq("user_id", state.session.user.id)
-    .maybeSingle();
+  let liked = likedOverride;
+  if (liked === null && state.likedPostIdsReady)
+    liked = state.likedPostIds.has(p.id);
+  if (liked === null || liked === undefined) {
+    const { data } = await supabase
+      .from("post_likes")
+      .select("post_id")
+      .eq("post_id", p.id)
+      .eq("user_id", state.session.user.id)
+      .maybeSingle();
+    liked = !!data;
+  }
   const author = p.author || {};
   const pages = Array.isArray(p.body_pages) ? p.body_pages : [];
   const type =
@@ -679,23 +762,18 @@ async function postCard(p) {
     pages[0].attachments.length
       ? `<div class="postAttachments"><strong>Attachments</strong>${pages[0].attachments.map((a) => `<a href="${esc(a.url)}" target="_blank" rel="noreferrer">📎 ${esc(a.name || "Attachment")}</a>`).join("")}</div>`
       : "";
-  const textContent =
-    type === "blog"
-      ? ""
-      : p.content
-        ? `<p class="postContent">${esc(p.content)}</p>`
-        : "";
+  const textContent = type === "blog" ? "" : renderPostText(p.content, p.id);
   const kindLabel =
     type === "blog" ? "BLOG" : type === "reel" ? "REEL" : "POST";
   const ownActions =
     p.author_id === state.session.user.id
       ? `<button class="postDeleteBtn" onclick="deletePost('${p.id}')" aria-label="Delete ${kindLabel.toLowerCase()}">Delete</button>`
       : "";
-  return `<article class="postCard ${type === "reel" ? "reelCard" : ""}">
+  return `<article class="postCard ${type === "reel" ? "reelCard" : ""}" data-post-id="${esc(p.id)}">
     <div class="postHeader"><div class="postAuthor" onclick="location.hash='user?id=${p.author_id}'">${image(author.avatar_url, author.display_name || author.full_name || author.username)}<div><strong>${esc(author.display_name || author.full_name || author.username || "Developer")}</strong><small>@${esc(author.username || "")} · ${timeAgo(p.created_at)}</small></div></div><div class="postHeaderActions"><span class="postKind ${type}">${kindLabel}</span>${ownActions}</div></div>
     <h2>${esc(p.title || kindLabel)}</h2>${textContent}${blog}${postCover}${attachments}${media}
     <div class="tags">${(p.tags || []).map((t) => `<span class="tag">#${esc(t)}</span>`).join("")}</div>
-    <div class="postMeta"><button onclick="toggleLike('${p.id}',${!!liked})">${liked ? "♥" : "♡"} ${p.like_count || 0}</button><button onclick="openComments('${p.id}')">💬 ${p.comment_count || 0}</button><button onclick="viewPost('${p.id}')">👁 ${p.view_count || 0}</button><button onclick="location.hash='user?id=${p.author_id}'">Profile</button></div>
+    <div class="postMeta"><button class="likeButton" data-like-button="${esc(p.id)}" aria-pressed="${!!liked}" onclick="toggleLike('${p.id}',${!!liked})">${liked ? "♥" : "♡"} ${p.like_count || 0}</button><button class="commentButton" data-comment-button="${esc(p.id)}" onclick="openComments('${p.id}')">💬 ${p.comment_count || 0}</button><button onclick="viewPost('${p.id}')">👁 ${p.view_count || 0}</button><button onclick="location.hash='user?id=${p.author_id}'">Profile</button></div>
   </article>`;
 }
 
@@ -734,9 +812,9 @@ async function renderHome(page) {
       <div class="homeCreateActions"><button class="primary" onclick="openPostModal('post')">＋ Post</button><button class="secondary" onclick="openPostModal('reel')">▶ Reel</button></div>
     </section>
     <div class="homeFeedTabs" role="tablist" aria-label="Feed content type">
-      <button class="feedTab active" data-feed-filter="post" role="tab" aria-selected="true">Posts <span id="feedCountPosts">0</span></button>
-      <button class="feedTab" data-feed-filter="blog" role="tab" aria-selected="false">Blogs <span id="feedCountBlogs">0</span></button>
-      <button class="feedTab" data-feed-filter="reel" role="tab" aria-selected="false">Reels <span id="feedCountReels">0</span></button>
+      <button class="feedTab active" data-feed-filter="post" role="tab" aria-selected="true">Posts</button>
+      <button class="feedTab" data-feed-filter="blog" role="tab" aria-selected="false">Blogs</button>
+      <button class="feedTab" data-feed-filter="reel" role="tab" aria-selected="false">Reels</button>
     </div>
     <div class="homeFeedLayout">
       <section class="homeFeedColumn"><div class="homeFeedLabel"><span id="activeFeedLabel">Posts</span><span class="homeFeedRule">Scroll to explore</span></div><div id="feedList" class="instagramFeed">Loading posts…</div></section>
@@ -746,17 +824,17 @@ async function renderHome(page) {
 
   const posts = await getPosts();
   state.homeFeedPosts = posts;
-  const counts = { post: 0, blog: 0, reel: 0 };
-  posts.forEach((p) => {
-    const pages = Array.isArray(p.body_pages) ? p.body_pages : [];
-    const type =
-      p.post_type === "reel" ? "reel" : pages.length > 1 ? "blog" : "post";
-    counts[type]++;
-  });
-  document.querySelector("#feedCountPosts").textContent = counts.post;
-  document.querySelector("#feedCountBlogs").textContent = counts.blog;
-  document.querySelector("#feedCountReels").textContent = counts.reel;
-
+  state.likedPostIds = new Set();
+  state.likedPostIdsReady = true;
+  const homePostIds = posts.map((p) => p.id).filter(Boolean);
+  if (homePostIds.length) {
+    const { data: likedRows } = await supabase
+      .from("post_likes")
+      .select("post_id")
+      .in("post_id", homePostIds)
+      .eq("user_id", state.session.user.id);
+    state.likedPostIds = new Set((likedRows || []).map((r) => r.post_id));
+  }
   async function paintFeed(filter = "post") {
     const list = document.querySelector("#feedList");
     if (!list) return;
@@ -775,7 +853,11 @@ async function renderHome(page) {
       return type === filter;
     });
     list.innerHTML = visible.length
-      ? (await Promise.all(visible.map(postCard))).join("")
+      ? (
+          await Promise.all(
+            visible.map((p) => postCard(p, state.likedPostIds.has(p.id))),
+          )
+        ).join("")
       : empty(
           `No ${label.toLowerCase()} yet`,
           `There are no ${label.toLowerCase()} in your feed yet.`,
@@ -791,28 +873,71 @@ async function renderHome(page) {
 }
 
 async function toggleLike(postId, liked) {
+  const button = document.querySelector(
+    `[data-like-button="${CSS.escape(postId)}"]`,
+  );
+  const card = document.querySelector(`[data-post-id="${CSS.escape(postId)}"]`);
+  const currentCount = Number(
+    (button?.textContent || "").match(/\d+/)?.[0] || 0,
+  );
+  const nextLiked = !liked;
+  const nextCount = Math.max(0, currentCount + (nextLiked ? 1 : -1));
+  if (button) {
+    button.dataset.pending = "1";
+    button.setAttribute("aria-pressed", String(nextLiked));
+    button.textContent = `${nextLiked ? "♥" : "♡"} ${nextCount}`;
+  }
+  state.likedPostIds[nextLiked ? "add" : "delete"](postId);
   const post = await supabase
     .from("posts")
     .select("author_id,title")
     .eq("id", postId)
     .single();
-  if (post.error) return toast(post.error.message, "error");
-  const res = liked
+  if (post.error) {
+    if (button) {
+      button.setAttribute("aria-pressed", String(liked));
+      button.textContent = `${liked ? "♥" : "♡"} ${currentCount}`;
+      button.dataset.pending = "";
+    }
+    state.likedPostIds[liked ? "add" : "delete"](postId);
+    return toast(post.error.message, "error");
+  }
+  const res = nextLiked
     ? await supabase
+        .from("post_likes")
+        .insert({ post_id: postId, user_id: state.session.user.id })
+    : await supabase
         .from("post_likes")
         .delete()
         .eq("post_id", postId)
-        .eq("user_id", state.session.user.id)
-    : await supabase
-        .from("post_likes")
-        .insert({ post_id: postId, user_id: state.session.user.id });
-  if (res.error) toast(res.error.message, "error");
-  else {
-    if (state.route === "home") navigate("home");
-    else if (state.route === "user") navigate(location.hash.slice(1));
+        .eq("user_id", state.session.user.id);
+  if (res.error) {
+    if (button) {
+      button.setAttribute("aria-pressed", String(liked));
+      button.textContent = `${liked ? "♥" : "♡"} ${currentCount}`;
+      button.dataset.pending = "";
+    }
+    state.likedPostIds[liked ? "add" : "delete"](postId);
+    return toast(res.error.message, "error");
   }
+  if (button) button.dataset.pending = "";
+  if (card) card.dataset.likeCount = String(nextCount);
 }
 window.toggleLike = toggleLike;
+
+function renderCommentNode(c, byParent, likedSet, postId, depth = 0) {
+  const replies = byParent[c.id] || [];
+  const liked = likedSet.has(c.id);
+  const replyHtml = replies
+    .map((r) => renderCommentNode(r, byParent, likedSet, postId, depth + 1))
+    .join("");
+  return `<div class="comment ${depth ? "replyComment" : ""}" data-comment-id="${esc(c.id)}" data-parent-id="${esc(c.parent_id || "")}" style="margin-left:${Math.min(depth, 3) * 24}px">
+    <button class="commentAuthor" onclick="closeModal();location.hash='user?id=${c.author_id}'">${image(c.author?.avatar_url, c.author?.display_name || c.author?.full_name || c.author?.username, "avatar small")}<span><b>${esc(c.author?.display_name || c.author?.full_name || c.author?.username || "User")}</b><small>@${esc(c.author?.username || "")} · ${timeAgo(c.created_at)}</small></span></button>
+    <p>${esc(c.content)}</p>
+    <div class="commentActions"><button class="commentLikeButton" data-comment-like="${esc(c.id)}" aria-pressed="${liked}" onclick="toggleCommentLike('${c.id}',${liked},'${postId}')">${liked ? "♥" : "♡"} ${c.like_count || 0}</button><button class="replyToggleButton" data-replies-toggle="${esc(c.id)}" onclick="toggleCommentReplies('${c.id}')">Replies${replies.length ? ` (${replies.length})` : ""}</button></div>
+    <div class="commentReplies" data-comment-replies="${esc(c.id)}" hidden>${replyHtml}<button class="replyActionButton" type="button" onclick="replyToComment('${c.id}')">↩ Reply</button></div>
+  </div>`;
+}
 
 async function openComments(postId) {
   const { data: comments, error } = await supabase
@@ -823,59 +948,169 @@ async function openComments(postId) {
     .eq("post_id", postId)
     .order("created_at", { ascending: true });
   if (error) return toast(error.message, "error");
-  const { data: likes } = await supabase
-    .from("comment_likes")
-    .select("comment_id")
-    .in("comment_id", (comments || []).map((c) => c.id).filter(Boolean))
-    .eq("user_id", state.session.user.id);
+  const ids = (comments || []).map((c) => c.id).filter(Boolean);
+  const { data: likes } = ids.length
+    ? await supabase
+        .from("comment_likes")
+        .select("comment_id")
+        .in("comment_id", ids)
+        .eq("user_id", state.session.user.id)
+    : { data: [] };
   const likedSet = new Set((likes || []).map((x) => x.comment_id));
+  state.commentLikeIds = likedSet;
   const byParent = {};
-  (comments || []).forEach((c) => {
-    (byParent[c.parent_id || "root"] ||= []).push(c);
-  });
-  const renderComment = (c, depth = 0) => {
-    const replies = byParent[c.id] || [];
-    return `<div class="comment ${depth ? "replyComment" : ""}" style="margin-left:${Math.min(depth, 3) * 24}px"><button class="commentAuthor" onclick="closeModal();location.hash='user?id=${c.author_id}'">${image(c.author?.avatar_url, c.author?.display_name || c.author?.full_name || c.author?.username, "avatar small")}<span><b>${esc(c.author?.display_name || c.author?.full_name || c.author?.username)}</b><small>@${esc(c.author?.username || "")} · ${timeAgo(c.created_at)}</small></span></button><p>${esc(c.content)}</p><div class="commentActions"><button onclick="toggleCommentLike('${c.id}',${likedSet.has(c.id)},'${postId}')">${likedSet.has(c.id) ? "♥" : "♡"} ${c.like_count || 0}</button><button onclick="replyToComment('${c.id}')">↩ Reply</button></div>${replies.map((r) => renderComment(r, depth + 1)).join("")}</div>`;
-  };
-  modal(
-    `<h2>Comments</h2><div class="commentList">${(byParent.root || []).map((c) => renderComment(c)).join("") || `<p class="muted">No comments yet.</p>`}</div><form id="commentForm"><label>Add a comment<textarea name="content" rows="3" required></textarea></label><input type="hidden" name="parentId"><button class="primary full">Comment</button></form>`,
+  (comments || []).forEach((c) =>
+    (byParent[c.parent_id || "root"] ||= []).push(c),
   );
-  document.querySelector("#commentForm").onsubmit = async (e) => {
+  modal(
+    `<div class="commentsModal" data-comments-modal="${esc(postId)}"><div class="commentsModalHeader"><h2>Comments</h2></div><div class="commentList" id="commentList">${(byParent.root || []).map((c) => renderCommentNode(c, byParent, likedSet, postId)).join("") || `<p class="muted">No comments yet.</p>`}</div><form id="commentForm"><label>Add a comment<textarea name="content" rows="3" required placeholder="Share your thoughts…"></textarea></label><input type="hidden" name="parentId"><div class="replyingTo hidden" id="replyingTo"></div><button class="primary full">Comment</button></form></div>`,
+  );
+  const form = document.querySelector("#commentForm");
+  form.onsubmit = async (e) => {
     e.preventDefault();
-    const f = new FormData(e.target);
-    const content = String(f.get("content")).trim();
+    const f = new FormData(form);
+    const content = String(f.get("content") || "").trim();
     const parentId = f.get("parentId") || null;
-    const { error } = await supabase.from("post_comments").insert({
-      post_id: postId,
-      author_id: state.session.user.id,
-      parent_id: parentId,
-      content,
-    });
-    if (error) toast(error.message, "error");
-    else {
-      closeModal();
-      toast(parentId ? "Reply added." : "Comment added.", "success");
-      await openComments(postId);
+    if (!content) return;
+    const submit = form.querySelector("button[type=submit]");
+    if (submit) {
+      submit.disabled = true;
+      submit.textContent = "Posting…";
+    }
+    const { data: inserted, error: insertError } = await supabase
+      .from("post_comments")
+      .insert({
+        post_id: postId,
+        author_id: state.session.user.id,
+        parent_id: parentId,
+        content,
+      })
+      .select(
+        "*,author:profiles!post_comments_author_id_fkey(id,username,display_name,full_name,avatar_url)",
+      )
+      .single();
+    if (insertError) {
+      if (submit) {
+        submit.disabled = false;
+        submit.textContent = "Comment";
+      }
+      return toast(insertError.message, "error");
+    }
+    const list = document.querySelector("#commentList");
+    list?.querySelector(".muted")?.remove();
+    if (parentId) {
+      const parentReplies = list?.querySelector(
+        `[data-comment-replies="${CSS.escape(parentId)}"]`,
+      );
+      if (parentReplies) {
+        parentReplies.hidden = false;
+        const replyButton = parentReplies.querySelector(".replyActionButton");
+        replyButton?.insertAdjacentHTML(
+          "beforebegin",
+          renderCommentNode(
+            inserted,
+            { root: [], [parentId]: [] },
+            new Set(),
+            postId,
+            1,
+          ),
+        );
+        const toggle = document.querySelector(
+          `[data-replies-toggle="${CSS.escape(parentId)}"]`,
+        );
+        if (toggle) {
+          const n = (toggle.textContent.match(/\d+/) || ["0"])[0] * 1 + 1;
+          toggle.textContent = `Replies (${n})`;
+        }
+      }
+    } else if (list) {
+      list.insertAdjacentHTML(
+        "beforeend",
+        renderCommentNode(
+          inserted,
+          { root: [], [inserted.id]: [] },
+          new Set(),
+          postId,
+        ),
+      );
+    }
+    const postCommentButton = document.querySelector(
+      `[data-comment-button="${CSS.escape(postId)}"]`,
+    );
+    if (postCommentButton) {
+      const count =
+        Number((postCommentButton.textContent || "").match(/\d+/)?.[0] || 0) +
+        1;
+      postCommentButton.textContent = `💬 ${count}`;
+    }
+    form.reset();
+    form.querySelector('input[name="parentId"]').value = "";
+    document.querySelector("#replyingTo")?.classList.add("hidden");
+    if (submit) {
+      submit.disabled = false;
+      submit.textContent = "Comment";
     }
   };
 }
+
+function toggleCommentReplies(commentId) {
+  const root = document.querySelector(
+    `[data-comment-id="${CSS.escape(commentId)}"]`,
+  );
+  const replies = root?.querySelector(
+    `[data-comment-replies="${CSS.escape(commentId)}"]`,
+  );
+  const button = root?.querySelector(
+    `[data-replies-toggle="${CSS.escape(commentId)}"]`,
+  );
+  if (!replies) return;
+  replies.hidden = !replies.hidden;
+  if (button) button.setAttribute("aria-expanded", String(!replies.hidden));
+}
+window.toggleCommentReplies = toggleCommentReplies;
+
 async function toggleCommentLike(commentId, liked, postId) {
-  const res = liked
+  const button = document.querySelector(
+    `[data-comment-like="${CSS.escape(commentId)}"]`,
+  );
+  const currentCount = Number(
+    (button?.textContent || "").match(/\d+/)?.[0] || 0,
+  );
+  const nextLiked = !liked;
+  if (button) {
+    button.setAttribute("aria-pressed", String(nextLiked));
+    button.textContent = `${nextLiked ? "♥" : "♡"} ${Math.max(0, currentCount + (nextLiked ? 1 : -1))}`;
+    button.dataset.pending = "1";
+  }
+  state.commentLikeIds[nextLiked ? "add" : "delete"](commentId);
+  const res = nextLiked
     ? await supabase
+        .from("comment_likes")
+        .insert({ comment_id: commentId, user_id: state.session.user.id })
+    : await supabase
         .from("comment_likes")
         .delete()
         .eq("comment_id", commentId)
-        .eq("user_id", state.session.user.id)
-    : await supabase
-        .from("comment_likes")
-        .insert({ comment_id: commentId, user_id: state.session.user.id });
-  if (res.error) toast(res.error.message, "error");
-  else openComments(postId);
+        .eq("user_id", state.session.user.id);
+  if (res.error) {
+    state.commentLikeIds[liked ? "add" : "delete"](commentId);
+    if (button) {
+      button.setAttribute("aria-pressed", String(liked));
+      button.textContent = `${liked ? "♥" : "♡"} ${currentCount}`;
+    }
+    return toast(res.error.message, "error");
+  }
+  if (button) button.dataset.pending = "";
 }
 window.toggleCommentLike = toggleCommentLike;
 function replyToComment(commentId) {
   const input = document.querySelector('#commentForm input[name="parentId"]');
+  const notice = document.querySelector("#replyingTo");
   if (input) input.value = commentId;
+  if (notice) {
+    notice.textContent = "Replying to this comment";
+    notice.classList.remove("hidden");
+  }
   document.querySelector("#commentForm textarea")?.focus();
 }
 window.replyToComment = replyToComment;
@@ -884,6 +1119,105 @@ async function viewPost(id) {
   await supabase.rpc("record_post_view", { post_id_input: id });
 }
 window.viewPost = viewPost;
+async function renderSearch(page, q = "", type = "posts") {
+  const safeType = ["posts", "developers", "reels"].includes(type)
+    ? type
+    : "posts";
+  const like = q
+    ? `%${q.replaceAll("%", "\\%").replaceAll("_", "\\_")}%`
+    : null;
+
+  let developers = { data: [], error: null };
+  let content = { data: [], error: null };
+
+  if (q && safeType === "developers") {
+    developers = await supabase
+      .from("profiles")
+      .select(
+        "id,username,display_name,full_name,avatar_url,bio,skills,location",
+      )
+      .or(
+        `username.ilike.${like},display_name.ilike.${like},full_name.ilike.${like},bio.ilike.${like},location.ilike.${like}`,
+      )
+      .limit(40);
+  }
+
+  if (q && safeType === "posts") {
+    content = await supabase
+      .from("posts")
+      .select(
+        "*,author:profiles!posts_author_id_fkey(id,username,display_name,full_name,avatar_url,location)",
+      )
+      .or(`title.ilike.${like},content.ilike.${like}`)
+      .neq("post_type", "reel")
+      .order("created_at", { ascending: false })
+      .limit(60);
+    if (!content.error) {
+      content.data = (content.data || []).filter((p) => {
+        const pages = Array.isArray(p.body_pages) ? p.body_pages : [];
+        return pages.length <= 1;
+      });
+    }
+  }
+
+  if (q && safeType === "reels") {
+    content = await supabase
+      .from("posts")
+      .select(
+        "*,author:profiles!posts_author_id_fkey(id,username,display_name,full_name,avatar_url,location)",
+      )
+      .or(`title.ilike.${like},content.ilike.${like}`)
+      .eq("post_type", "reel")
+      .order("created_at", { ascending: false })
+      .limit(40);
+  }
+
+  const error = developers.error || content.error;
+  if (error) {
+    page.innerHTML = empty(
+      "Search error",
+      error.message || "Try again in a moment.",
+    );
+    return;
+  }
+
+  if (q) trackInterest("search", q);
+
+  const tabs = [
+    ["posts", "Posts"],
+    ["developers", "Developers"],
+    ["reels", "Reels"],
+  ];
+
+  page.innerHTML = `<div class="searchResultsPage">
+    <section class="pageHead modernPageHead searchPageHead">
+      <div><div class="eyebrow">SEARCH</div><h1>${q ? `Results for “${esc(q)}”` : "Search Live Coders"}</h1><p>Find developers to connect with, posts to learn from, and reels to discover.</p></div>
+    </section>
+    <div class="searchTabs" role="tablist" aria-label="Search result type">
+      ${tabs.map(([key, label]) => `<button class="searchTab ${safeType === key ? "active" : ""}" data-search-type="${key}" role="tab" aria-selected="${safeType === key}">${label}</button>`).join("")}
+    </div>
+    <section id="searchResultList" class="searchResultList">
+      ${
+        !q
+          ? empty(
+              "Start searching",
+              "Use the top search bar to find developers, posts or reels.",
+            )
+          : safeType === "developers"
+            ? `<div class="userGrid">${(developers.data || []).map((u) => `<article class="userCard searchUserCard">${image(u.avatar_url, u.display_name || u.full_name || u.username, "avatar large")}<h3>${esc(u.display_name || u.full_name || u.username)}</h3><p>@${esc(u.username)}</p><p>${esc(u.bio || "Developer and builder.")}</p><button class="secondary full" onclick="location.hash='user?id=${u.id}'">View profile</button></article>`).join("") || empty("No developers found", "Try another search.")}</div>`
+            : `<div class="searchPostResults">${(await Promise.all((content.data || []).map(postCard))).join("") || empty(`No ${safeType === "reels" ? "reels" : "posts"} found`, "Try another search.")}</div>`
+      }
+    </section>
+  </div>`;
+
+  document.querySelectorAll(".searchTab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const nextType = tab.dataset.searchType;
+      location.hash = `search?q=${encodeURIComponent(q)}&type=${nextType}`;
+    });
+  });
+  wireBlogViewers(document.querySelector("#searchResultList"));
+}
 
 async function renderExplore(page, q = "") {
   const like = q
@@ -1129,20 +1463,6 @@ async function renderProfile(page, id) {
       .select("id", { count: "exact", head: true })
       .eq("author_id", id),
     supabase
-      .from("follows")
-      .select(
-        "follower_id,user:profiles!follows_follower_id_fkey(id,username,display_name,full_name,avatar_url)",
-      )
-      .eq("following_id", id)
-      .limit(100),
-    supabase
-      .from("follows")
-      .select(
-        "following_id,user:profiles!follows_following_id_fkey(id,username,display_name,full_name,avatar_url)",
-      )
-      .eq("follower_id", id)
-      .limit(100),
-    supabase
       .from("projects")
       .select("*,community:communities(id,name,logo_url)")
       .eq("owner_id", id)
@@ -1153,22 +1473,11 @@ async function renderProfile(page, id) {
       .eq("user_id", id),
     getPosts({ author: id }),
   ]);
-  const [
-    followersQ,
-    followingQ,
-    postsQ,
-    followerRows,
-    followingRows,
-    projects,
-    memberRows,
-    posts,
-  ] = results;
+  const [followersQ, followingQ, postsQ, projects, memberRows, posts] = results;
   const firstError = [
     followersQ,
     followingQ,
     postsQ,
-    followerRows,
-    followingRows,
     projects,
     memberRows,
   ].find((r) => r?.error)?.error;
@@ -1177,6 +1486,38 @@ async function renderProfile(page, id) {
   const followers = followersQ.count || 0,
     following = followingQ.count || 0,
     postCount = postsQ.count || 0;
+
+  // Profile content is grouped into the same three publishing types used by Home.
+  // A one-page item is a Post, a multi-page item is a Blog, and an explicit reel is a Reel.
+  const classifyProfileContent = (items) => {
+    const grouped = { post: [], blog: [], reel: [] };
+    (items || []).forEach((item) => {
+      const pages = Array.isArray(item.body_pages) ? item.body_pages : [];
+      const type =
+        item.post_type === "reel" ? "reel" : pages.length > 1 ? "blog" : "post";
+      grouped[type].push(item);
+    });
+    return grouped;
+  };
+  const profileContent = classifyProfileContent(posts);
+  const renderProfileCards = async (items, emptyTitle, emptyText) =>
+    (await Promise.all((items || []).map(postCard))).join("") ||
+    empty(emptyTitle, emptyText);
+  const profilePostCards = await renderProfileCards(
+    profileContent.post,
+    "No posts yet",
+    "This developer has not published a one-page post.",
+  );
+  const profileBlogCards = await renderProfileCards(
+    profileContent.blog,
+    "No blogs yet",
+    "This developer has not published a multi-page blog.",
+  );
+  const profileReelCards = await renderProfileCards(
+    profileContent.reel,
+    "No reels yet",
+    "This developer has not published a reel.",
+  );
   const own = id === state.session.user.id;
   let isFollowing = false;
   if (!own) {
@@ -1188,22 +1529,42 @@ async function renderProfile(page, id) {
       .maybeSingle();
     isFollowing = !!data;
   }
-  page.innerHTML = `<section class="profileHeader"><div class="profileAvatarWrap">${image(p.avatar_url, p.display_name || p.full_name || p.username, "profileAvatar")}</div><div class="profileIdentity"><div class="eyebrow">@${esc(p.username)}</div><h1>${esc(p.display_name || p.full_name || "Developer")}</h1><p>${esc(p.bio || "Building things and solving problems.")}</p>${p.location ? `<div class="profileLocation">⌖ ${esc(p.location)}</div>` : ""}<div class="profileStats"><button onclick="openPeopleList('${id}','followers')"><b>${followers}</b><span>followers</span></button><button onclick="openPeopleList('${id}','following')"><b>${following}</b><span>following</span></button><span><b>${postCount}</b><span>posts</span></span></div></div><div class="profileActions">${own ? `<button class="primary" onclick="openProfileModal()">Edit profile</button>` : `<button class="${isFollowing ? "secondary" : "primary"}" onclick="toggleFollow('${id}',${isFollowing})">${isFollowing ? "Unfollow" : "Follow"}</button><button class="secondary" onclick="messageUser('${id}')">Message</button>`}</div></section><div class="profileGrid"><section><div class="card"><h2>About</h2><p>${esc(p.bio || "No bio yet.")}</p>${p.location ? `<p class="profileLocation">⌖ ${esc(p.location)}</p>` : ""}<h3>Skills</h3><div class="tags">${(p.skills || []).map((s) => `<span class="tag">${esc(s)}</span>`).join("") || "<span class='muted'>No skills listed.</span>"}</div></div><div class="card"><div class="sectionTitle"><h2>Projects</h2>${own ? `<button class="secondary" onclick="openProjectModal()">+ Add project</button>` : ""}</div><div class="projectList">${(projects.data || []).map(projectCard).join("") || `<p class="muted">${own ? "Add your projects here." : "No projects added yet."}</p>`}</div></div><div class="card"><h2>Posts</h2><div class="profilePosts">${(await Promise.all((posts || []).map(postCard))).join("") || empty("No posts yet", "This developer has not posted anything.")}</div></div></section><aside><div class="card"><h3>Following (${following})</h3><div class="peopleList">${
-    (followingRows.data || [])
-      .slice(0, 12)
-      .map((row) => personRow(row.user))
-      .join("") || `<p class="muted">Not following anyone yet.</p>`
-  }</div>${following > 12 ? `<button class="linkButton" onclick="openPeopleList('${id}','following')">See all following</button>` : ""}</div><div class="card"><h3>Followers (${followers})</h3><div class="peopleList">${
-    (followerRows.data || [])
-      .slice(0, 12)
-      .map((row) => personRow(row.user))
-      .join("") || `<p class="muted">No followers yet.</p>`
-  }</div>${followers > 12 ? `<button class="linkButton" onclick="openPeopleList('${id}','followers')">See all followers</button>` : ""}</div><div class="card"><h3>Communities & projects</h3><div class="peopleList">${(memberRows.data || []).map((x) => (x.community ? `<button class="memberRow" onclick="location.hash='community?id=${x.community.id}'">${image(x.community.logo_url, x.community.name, "avatar")}<span><b>${esc(x.community.name)}</b><small>Joined community</small></span></button>` : " ")).join("") || `<p class="muted">No community links yet.</p>`}</div></div><div class="card"><h3>Links</h3>${linkLine("GitHub", p.github_url)}${linkLine("LinkedIn", p.linkedin_url)}${linkLine("Portfolio", p.portfolio_url)}${linkLine("Website", p.website_url)}</div></aside></div>`;
+  page.innerHTML = `<section class="profileHeader"><div class="profileAvatarWrap">${image(p.avatar_url, p.display_name || p.full_name || p.username, "profileAvatar")}</div><div class="profileIdentity"><div class="eyebrow">@${esc(p.username)}</div><h1>${esc(p.display_name || p.full_name || "Developer")}</h1><p>${esc(p.bio || "Building things and solving problems.")}</p>${p.location ? `<div class="profileLocation">⌖ ${esc(p.location)}</div>` : ""}<div class="profileStats"><button onclick="openPeopleList('${id}','followers')"><b>${followers}</b><span>followers</span></button><button onclick="openPeopleList('${id}','following')"><b>${following}</b><span>following</span></button><span><b>${postCount}</b><span>posts</span></span></div></div><div class="profileActions">${own ? `<button class="primary" onclick="openProfileModal()">Edit profile</button>` : `<button class="${isFollowing ? "secondary" : "primary"}" onclick="toggleFollow('${id}',${isFollowing})">${isFollowing ? "Unfollow" : "Follow"}</button><button class="secondary" onclick="messageUser('${id}')">Message</button>`}</div></section><div class="profileGrid"><section><div class="card"><h2>About</h2><p>${esc(p.bio || "No bio yet.")}</p>${p.location ? `<p class="profileLocation">⌖ ${esc(p.location)}</p>` : ""}<h3>Skills</h3><div class="tags">${(p.skills || []).map((s) => `<span class="tag">${esc(s)}</span>`).join("") || "<span class='muted'>No skills listed.</span>"}</div></div><div class="card"><div class="sectionTitle"><h2>Projects</h2>${own ? `<button class="secondary" onclick="openProjectModal()">+ Add project</button>` : ""}</div><div class="projectList">${(projects.data || []).map(projectCard).join("") || `<p class="muted">${own ? "Add your projects here." : "No projects added yet."}</p>`}</div></div><div class="card profileContentCard">
+  <div class="profileContentTabs" role="tablist" aria-label="Profile content">
+    <button class="profileContentTab active" type="button" role="tab" aria-selected="true" data-profile-content="post" onclick="switchProfileContent('post')">Posts</button>
+    <button class="profileContentTab" type="button" role="tab" aria-selected="false" data-profile-content="blog" onclick="switchProfileContent('blog')">Blogs</button>
+    <button class="profileContentTab" type="button" role="tab" aria-selected="false" data-profile-content="reel" onclick="switchProfileContent('reel')">Reels</button>
+  </div>
+  <div class="profileContentPanel" data-profile-panel="post">${profilePostCards}</div>
+  <div class="profileContentPanel hidden" data-profile-panel="blog">${profileBlogCards}</div>
+  <div class="profileContentPanel hidden" data-profile-panel="reel">${profileReelCards}</div>
+</div></section><aside><div class="card"><h3>Communities & projects</h3><div class="peopleList">${(memberRows.data || []).map((x) => (x.community ? `<button class="memberRow" onclick="location.hash='community?id=${x.community.id}'">${image(x.community.logo_url, x.community.name, "avatar")}<span><b>${esc(x.community.name)}</b><small>Joined community</small></span></button>` : " ")).join("") || `<p class="muted">No community links yet.</p>`}</div></div><div class="card"><h3>Links</h3>${linkLine("GitHub", p.github_url)}${linkLine("LinkedIn", p.linkedin_url)}${linkLine("Portfolio", p.portfolio_url)}${linkLine("Website", p.website_url)}</div></aside></div>`;
 }
-function personRow(u) {
-  return u
-    ? `<button class="memberRow" onclick="location.hash='user?id=${u.id}'">${image(u.avatar_url, u.display_name || u.full_name || u.username)}<span><b>${esc(u.display_name || u.full_name || u.username)}</b><small>@${esc(u.username)}</small></span></button>`
-    : "";
+function switchProfileContent(type = "post") {
+  const allowed = new Set(["post", "blog", "reel"]);
+  if (!allowed.has(type)) type = "post";
+  document.querySelectorAll("[data-profile-content]").forEach((tab) => {
+    const active = tab.dataset.profileContent === type;
+    tab.classList.toggle("active", active);
+    tab.setAttribute("aria-selected", active ? "true" : "false");
+  });
+  document.querySelectorAll("[data-profile-panel]").forEach((panel) => {
+    panel.classList.toggle("hidden", panel.dataset.profilePanel !== type);
+  });
+}
+window.switchProfileContent = switchProfileContent;
+
+function personRow(u, isFollowing = false) {
+  if (!u) return "";
+  const name = u.display_name || u.full_name || u.username || "Developer";
+  const safeFollowing = !!isFollowing;
+  return `<div class="memberRow personRow" data-user-id="${u.id}">
+    <button class="personRowIdentity" type="button" onclick="location.hash='user?id=${u.id}'">
+      ${image(u.avatar_url, name)}
+      <span><b>${esc(name)}</b><small>@${esc(u.username || "")}</small></span>
+    </button>
+    ${u.id !== state.session.user.id ? `<button type="button" class="personFollowBtn ${safeFollowing ? "secondary" : "primary"}" data-following="${safeFollowing ? "true" : "false"}" onclick="event.stopPropagation(); toggleFollowInPlace('${u.id}', this)">${safeFollowing ? "Unfollow" : "Follow"}</button>` : ""}
+  </div>`;
 }
 function projectCard(x) {
   return `<div class="projectCard"><div><h3>${esc(x.name)}</h3><p>${esc(x.description || "")}</p><div class="tags">${(x.technologies || []).map((t) => `<span class="tag">${esc(t)}</span>`).join("")}</div>${x.community ? `<button class="communityLink" onclick="location.hash='community?id=${x.community.id}'">${esc(x.community.name)}</button>` : ""}</div>${x.url ? `<a target="_blank" rel="noreferrer" href="${esc(x.url)}">Open</a>` : ""}</div>`;
@@ -1217,18 +1578,67 @@ function linkLine(label, url) {
 async function openPeopleList(userId, type) {
   const col = type === "followers" ? "follower_id" : "following_id",
     match = type === "followers" ? "following_id" : "follower_id";
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("follows")
     .select(
-      `${col},user:profiles!follows_${col}_fkey(id,username,display_name,full_name,avatar_url)`,
+      `${col},created_at,user:profiles!follows_${col}_fkey(id,username,display_name,full_name,avatar_url)`,
     )
     .eq(match, userId)
     .order("created_at", { ascending: false });
+  if (error) return toast(error.message, "error");
+
+  const people = (data || []).map((x) => x.user).filter(Boolean);
+  let followingIds = new Set();
+  if (people.length && state.session?.user?.id) {
+    const { data: mine } = await supabase
+      .from("follows")
+      .select("following_id")
+      .eq("follower_id", state.session.user.id)
+      .in(
+        "following_id",
+        people.map((u) => u.id),
+      );
+    followingIds = new Set((mine || []).map((x) => x.following_id));
+  }
+
   modal(
-    `<h2>${type === "followers" ? "Followers" : "Following"}</h2><div class="peopleList">${(data || []).map((x) => personRow(x.user)).join("") || `<p class="muted">No ${type} yet.</p>`}</div>`,
+    `<h2>${type === "followers" ? "Followers" : "Following"}</h2><div class="peopleList">${people.map((u) => personRow(u, followingIds.has(u.id))).join("") || `<p class="muted">No ${type} yet.</p>`}</div>`,
   );
 }
 window.openPeopleList = openPeopleList;
+
+async function toggleFollowInPlace(id, button) {
+  if (!id || id === state.session.user.id || button.disabled) return;
+  const currentlyFollowing = button.dataset.following === "true";
+  const previousText = button.textContent;
+  button.disabled = true;
+  button.textContent = currentlyFollowing ? "Unfollowing…" : "Following…";
+  try {
+    const action = currentlyFollowing
+      ? supabase
+          .from("follows")
+          .delete()
+          .eq("follower_id", state.session.user.id)
+          .eq("following_id", id)
+      : supabase
+          .from("follows")
+          .insert({ follower_id: state.session.user.id, following_id: id });
+    const { error } = await action;
+    if (error) throw error;
+    const next = !currentlyFollowing;
+    button.dataset.following = next ? "true" : "false";
+    button.textContent = next ? "Unfollow" : "Follow";
+    button.classList.toggle("primary", !next);
+    button.classList.toggle("secondary", next);
+    toast(next ? "Following." : "Unfollowed.", "success");
+  } catch (err) {
+    button.textContent = previousText;
+    toast(err.message || "Could not update follow status.", "error");
+  } finally {
+    button.disabled = false;
+  }
+}
+window.toggleFollowInPlace = toggleFollowInPlace;
 
 async function toggleFollow(id, following) {
   const action = following
@@ -2170,7 +2580,9 @@ window.deleteCommunityChannel = async function (event, communityId, channelId) {
 
 async function renderNotifications(page) {
   await loadNotifications();
-  page.innerHTML = `<div class="pageHead"><div><div class="eyebrow">NOTIFICATIONS</div><h1>Activity</h1><p>Likes, comments, follows, messages and community activity.</p></div><button class="secondary" id="readAll">Mark all read</button></div><div class="notificationList">${state.notifications.length ? state.notifications.map((n) => `<button class="notification ${n.is_read ? "" : "unread"}" onclick="markNotification('${n.id}')">${image(n.actor?.avatar_url, n.actor?.display_name || n.actor?.username)}<span><p>${esc(n.message)}</p><small>${timeAgo(n.created_at)}</small></span></button>`).join("") : empty("You're all caught up", "New activity will appear here.")}</div>`;
+  const visibleCount = state.notificationVisibleCount || 10;
+  const visible = state.notifications.slice(0, visibleCount);
+  page.innerHTML = `<div class="pageHead"><div><div class="eyebrow">NOTIFICATIONS</div><h1>Activity</h1><p>Recent activity first. Older notifications are available with More.</p></div><button class="secondary" id="readAll">Mark all read</button></div><div class="notificationList">${visible.length ? visible.map((n) => `<button class="notification ${n.is_read ? "" : "unread"}" onclick="markNotification('${n.id}')">${image(n.actor?.avatar_url, n.actor?.display_name || n.actor?.username)}<span><p>${esc(n.message)}</p><small>${timeAgo(n.created_at)}</small></span></button>`).join("") : empty("You're all caught up", "New activity will appear here.")}</div>${state.notifications.length > visibleCount ? `<div class="notificationMoreWrap"><button class="secondary" id="moreNotifications">More notifications</button></div>` : ""}`;
   document.querySelector("#readAll").onclick = async () => {
     await supabase
       .from("notifications")
@@ -2180,6 +2592,15 @@ async function renderNotifications(page) {
     renderShell();
     navigate("notifications");
   };
+  const more = document.querySelector("#moreNotifications");
+  if (more)
+    more.onclick = () => {
+      state.notificationVisibleCount = Math.min(
+        state.notifications.length,
+        visibleCount + 10,
+      );
+      renderNotifications(page);
+    };
 }
 async function loadNotifications() {
   const { data } = await supabase
@@ -2189,7 +2610,7 @@ async function loadNotifications() {
     )
     .eq("recipient_id", state.session.user.id)
     .order("created_at", { ascending: false })
-    .limit(100);
+    .limit(1000);
   state.notifications = data || [];
 }
 const unreadNotificationCount = () =>
@@ -2254,12 +2675,45 @@ function openPostModal(initialMode = "post") {
 }
 window.openPostModal = openPostModal;
 
+function validate16x9Image(file) {
+  return new Promise((resolve, reject) => {
+    if (!file || !file.type?.startsWith("image/")) {
+      reject(new Error("Choose a valid cover image."));
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const exact16x9 =
+        img.naturalWidth > 0 &&
+        img.naturalHeight > 0 &&
+        img.naturalWidth * 9 === img.naturalHeight * 16;
+      URL.revokeObjectURL(url);
+      if (!exact16x9) {
+        reject(
+          new Error(
+            `Cover image must be exactly 16:9. Selected image is ${img.naturalWidth}×${img.naturalHeight}.`,
+          ),
+        );
+        return;
+      }
+      resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Could not read the cover image."));
+    };
+    img.src = url;
+  });
+}
+
 async function uploadPostImages(files) {
   const images = [];
   for (const file of [...(files || [])]) {
     if (!file.type.startsWith("image/")) continue;
+    await validate16x9Image(file);
     if (file.size > 8 * 1024 * 1024)
-      throw new Error("Each image must be smaller than 8 MB.");
+      throw new Error("Each cover image must be smaller than 8 MB.");
     const path = `${state.session.user.id}/posts/${crypto.randomUUID()}-${(file.name || "image").replace(/[^a-zA-Z0-9._-]/g, "_")}`;
     const up = await supabase.storage
       .from("post-media")
@@ -2274,6 +2728,29 @@ async function uploadPostImages(files) {
     );
   }
   return images;
+}
+
+async function uploadReelCover(file) {
+  if (!file?.size) return null;
+  if (!file.type?.startsWith("image/"))
+    throw new Error("Reel cover must be an image file.");
+  if (file.size > 8 * 1024 * 1024)
+    throw new Error("Reel cover must be smaller than 8 MB.");
+  await validate16x9Image(file);
+  const safe = (file.name || "reel-cover").replace(/[^a-zA-Z0-9._-]/g, "_");
+  const path = `${state.session.user.id}/reels/covers/${crypto.randomUUID()}-${safe}`;
+  const { error } = await supabase.storage
+    .from("post-media")
+    .upload(path, file, {
+      upsert: false,
+      contentType: file.type,
+      cacheControl: "31536000",
+    });
+  if (error)
+    throw new Error(
+      `Reel cover upload failed: ${error.message || "storage error"}`,
+    );
+  return supabase.storage.from("post-media").getPublicUrl(path).data.publicUrl;
 }
 
 async function uploadPostAttachments(files) {
@@ -2411,7 +2888,10 @@ async function publishCreateForm(form, mode) {
         form.querySelector(".postAttachmentInput")?.files || [],
       );
       let cover = null;
-      if (coverFile) cover = (await uploadPostImages([coverFile]))[0] || null;
+      if (coverFile) {
+        await validate16x9Image(coverFile);
+        cover = (await uploadPostImages([coverFile]))[0] || null;
+      }
       const text = String(fd.get("content") || "").trim();
       if (!text && !cover && !attachments.length)
         throw new Error(
@@ -2426,12 +2906,13 @@ async function publishCreateForm(form, mode) {
         },
       ];
     } else {
+      const coverFile =
+        form.querySelector(".reelCoverInput")?.files?.[0] || null;
+      let cover = null;
+      if (coverFile) cover = await uploadReelCover(coverFile);
       const media = await uploadPostVideo(fd.get("media"));
       mediaUrl = media.url;
       mediaType = media.type;
-      const coverFile = form.querySelector(".reelCoverInput")?.files?.[0];
-      let cover = null;
-      if (coverFile) cover = (await uploadPostImages([coverFile]))[0] || null;
       bodyPages = [
         {
           text: String(fd.get("caption") || "").trim(),
@@ -2521,14 +3002,13 @@ async function renderCreate(page, activeMode = "post") {
         <div class="creatorStep"><b>1</b><strong>Create Post</strong></div>
         <input name="title" required maxlength="180" placeholder="Title">
         <textarea class="creatorSingleText" name="content" rows="9" maxlength="5000" placeholder="What's on your mind? Share something with the community…"></textarea>
-        <label class="creatorUploadBox"><span>＋ Add cover image</span><small>One optional cover image · shown in a 16:9 viewer</small><input class="postCoverInput" type="file" accept="image/*"></label>
+        <label class="creatorUploadBox"><span>＋ Add cover image</span><small>One optional cover image · exactly 16:9 · JPG, PNG or WEBP</small><input class="postCoverInput" type="file" accept="image/*"></label>
         <div class="postCoverPreview creatorImagePreview"></div>
         <label class="creatorUploadBox"><span>＋ Attach files</span><small>Up to 5 non-image files · 20 MB each</small><input class="postAttachmentInput" type="file" multiple accept=".pdf,.doc,.docx,.txt,.csv,.json,.zip,.rar,.js,.ts,.jsx,.tsx,.html,.css,.md"></label>
         <div class="postAttachmentPreview"></div>
         ${creatorMentionMarkup()}
         <label>Topics<input name="tags" placeholder="React, startup, AI, trading"></label>
         <label>Category<select name="category"><option>Project Showcase</option><option>Developer Problem</option><option>Startup Discussion</option><option>Trading</option><option>AI & Machine Learning</option><option>Web Development</option><option>Career & Jobs</option><option>Founders & Growth</option></select></label>
-        <div class="creatorStep"><b>2</b><strong>Preview</strong></div><div class="creatorMiniPreview"><strong>Your post</strong><span>One page = one post. The cover image is optional; attachments stay available below the post.</span></div>
         <button class="primary creatorPublishBtn" type="submit">Publish Post</button>
       </form>`
           : `<form class="creatorForm creatorSingleForm" id="reelCreatorForm">
@@ -2537,11 +3017,10 @@ async function renderCreate(page, activeMode = "post") {
         <div class="creatorVideoPreview"></div>
         <input name="title" required maxlength="180" placeholder="Reel title">
         <textarea name="caption" rows="6" maxlength="2200" placeholder="Tell people what the reel shows…"></textarea>
-        <label class="creatorUploadBox"><span>＋ Add cover</span><small>Optional thumbnail</small><input class="reelCoverInput" type="file" accept="image/*"></label><div class="reelCoverPreview"></div>
+        <label class="creatorUploadBox reelCoverUpload"><span>＋ Add reel cover</span><small>Optional thumbnail · exactly 16:9 · JPG, PNG or WEBP · max 8 MB</small><input class="reelCoverInput" type="file" accept="image/jpeg,image/png,image/webp"></label><div class="reelCoverPreview"></div>
         ${creatorMentionMarkup()}
         <label>Topics<input name="tags" placeholder="AI, trading, startup, build in public"></label>
         <label>Category<select name="category"><option>Project Showcase</option><option>AI & Machine Learning</option><option>Trading</option><option>Startup Discussion</option><option>Web Development</option><option>Career & Jobs</option><option>Founders & Growth</option></select></label>
-        <div class="creatorStep"><b>2</b><strong>Preview</strong></div><div class="creatorReelPreview"><span>16:9 video preview</span></div>
         <button class="creatorPublishBtn reelPublish" type="submit">Publish Reel</button>
       </form>`
       }
@@ -2555,12 +3034,25 @@ async function renderCreate(page, activeMode = "post") {
     e.preventDefault();
     publishCreateForm(e.currentTarget, mode);
   };
-  document.querySelector(".postCoverInput")?.addEventListener("change", (e) => {
-    const file = e.target.files?.[0];
-    if (file)
-      document.querySelector(".postCoverPreview").innerHTML =
-        `<div class="creatorPreviewImage"><img src="${URL.createObjectURL(file)}" alt="Post cover preview"><span>${esc(file.name)}</span></div>`;
-  });
+  document
+    .querySelector(".postCoverInput")
+    ?.addEventListener("change", async (e) => {
+      const input = e.currentTarget;
+      const file = input.files?.[0];
+      const preview = document.querySelector(".postCoverPreview");
+      if (!file) {
+        preview.innerHTML = "";
+        return;
+      }
+      try {
+        await validate16x9Image(file);
+        preview.innerHTML = `<div class="creatorPreviewImage"><img src="${URL.createObjectURL(file)}" alt="Post cover"><span>16:9 cover · ${esc(file.name)}</span></div>`;
+      } catch (err) {
+        input.value = "";
+        preview.innerHTML = `<div class="coverRatioError">${esc(err.message)}</div>`;
+        toast(err.message, "error");
+      }
+    });
   document
     .querySelector(".postAttachmentInput")
     ?.addEventListener("change", (e) => {
@@ -2572,12 +3064,28 @@ async function renderCreate(page, activeMode = "post") {
         )
         .join("");
     });
-  document.querySelector(".reelCoverInput")?.addEventListener("change", (e) => {
-    const file = e.target.files?.[0];
-    if (file)
-      document.querySelector(".reelCoverPreview").innerHTML =
-        `<img src="${URL.createObjectURL(file)}" alt="Reel cover preview">`;
-  });
+  document
+    .querySelector(".reelCoverInput")
+    ?.addEventListener("change", async (e) => {
+      const input = e.currentTarget;
+      const file = input.files?.[0];
+      const preview = document.querySelector(".reelCoverPreview");
+      if (!file) {
+        preview.innerHTML = "";
+        return;
+      }
+      try {
+        await validate16x9Image(file);
+        if (file.size > 8 * 1024 * 1024)
+          throw new Error("Reel cover must be smaller than 8 MB.");
+        const url = URL.createObjectURL(file);
+        preview.innerHTML = `<img src="${url}" alt="Reel cover"><div class="coverSelectionMeta"><small class="coverRatioOk">16:9 cover accepted</small><small>${esc(file.name)} · ${Math.max(1, Math.round(file.size / 1024))} KB</small></div>`;
+      } catch (err) {
+        input.value = "";
+        preview.innerHTML = `<div class="coverRatioError">${esc(err.message)}</div>`;
+        toast(err.message, "error");
+      }
+    });
   document
     .querySelector("#reelCreatorForm input[name='media']")
     ?.addEventListener("change", (e) => {
@@ -2935,9 +3443,51 @@ function subscribeRealtime() {
     )
     .on(
       "postgres_changes",
-      { event: "*", schema: "public", table: "post_comments" },
-      async () => {
-        if (state.route === "home") navigate("home");
+      { event: "INSERT", schema: "public", table: "posts" },
+      async (p) => {
+        if (
+          state.route !== "home" ||
+          !state.session?.user?.id ||
+          !p.new?.author_id
+        )
+          return;
+        const { data: follow } = await supabase
+          .from("follows")
+          .select("following_id")
+          .eq("follower_id", state.session.user.id)
+          .eq("following_id", p.new.author_id)
+          .maybeSingle();
+        if (!follow) return;
+        state.feedPriorityIds = [
+          ...new Set([...(state.feedPriorityIds || []), p.new.id]),
+        ];
+        // Do not reload the whole feed. The new followed post will appear on the next refresh.
+        const feed = document.querySelector("#feedList");
+        if (
+          feed &&
+          !feed.querySelector(`[data-post-id="${CSS.escape(p.new.id)}"]`)
+        ) {
+          const notice = document.createElement("div");
+          notice.className = "newContentNotice";
+          notice.textContent =
+            "New post from someone you follow — refresh to view";
+          feed.prepend(notice);
+        }
+      },
+    )
+    .on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "post_comments" },
+      async (p) => {
+        // Comments are updated locally; never reload the home page for a comment event.
+        const postId = p.new?.post_id;
+        if (
+          !postId ||
+          !document.querySelector(
+            `[data-comment-button="${CSS.escape(postId)}"]`,
+          )
+        )
+          return;
       },
     )
     .subscribe();

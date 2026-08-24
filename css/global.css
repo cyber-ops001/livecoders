@@ -8025,7 +8025,7 @@ select {
   min-width: 92px;
 }
 .homeFeedTabs {
-  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
 }
 .feedTab {
   color: #a9bbcf !important;
@@ -8307,7 +8307,7 @@ select {
 }
 @media (max-width: 600px) {
   .homeFeedTabs {
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
   .homeFeedIntro h1 {
     font-size: 25px !important;
@@ -8417,5 +8417,608 @@ select {
   }
   .postAttachments {
     padding: 8px;
+  }
+}
+
+/* v20.6.2 — strict 16:9 cover validation + no creator preview step */
+.coverRatioError {
+  padding: 10px 12px;
+  border: 1px solid #7f3340;
+  border-radius: 8px;
+  background: #24101a;
+  color: #ffb7c0;
+  font-size: 11px;
+  line-height: 1.45;
+}
+.coverRatioOk {
+  display: block;
+  margin-top: 6px;
+  color: #67d7a1;
+  font-size: 10px;
+  font-weight: 700;
+}
+.creatorMiniPreview,
+.creatorReelPreview {
+  display: none !important;
+}
+
+/* V20.6.3 — compact Twitter-style media + long-text reader */
+.instagramFeed .postCard {
+  max-width: 760px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.instagramFeed .postMedia,
+.instagramFeed .postCoverView {
+  width: min(100%, 680px);
+  max-height: 390px;
+  margin: 14px auto 12px;
+}
+.instagramFeed .postMedia img,
+.instagramFeed .postMedia video,
+.instagramFeed .postCoverView img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16/9 !important;
+  max-height: 390px !important;
+  object-fit: cover !important;
+  border-radius: 10px;
+}
+.instagramFeed .reelCard .postMedia {
+  width: min(100%, 680px) !important;
+  max-width: 680px !important;
+  margin: 14px auto 12px !important;
+}
+.instagramFeed .reelCard .postMedia video {
+  aspect-ratio: 16/9 !important;
+  max-height: 390px !important;
+  object-fit: cover !important;
+}
+.postContent {
+  max-width: 680px;
+  overflow-wrap: anywhere;
+}
+.postTextWrap .postFullText {
+  white-space: pre-wrap;
+}
+.readMoreBtn {
+  border: 0;
+  background: transparent;
+  color: #4f9cff;
+  font: inherit;
+  font-weight: 800;
+  padding: 0 0 0 4px;
+  cursor: pointer;
+}
+.readMoreBtn:hover {
+  text-decoration: underline;
+  color: #78b7ff;
+}
+.coverSelectionMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 6px;
+  color: #7f91aa;
+  font-size: 10px;
+}
+.reelCoverPreview img {
+  width: 100%;
+  max-width: 680px;
+  aspect-ratio: 16/9;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid #223a58;
+}
+@media (max-width: 760px) {
+  .instagramFeed .postCard {
+    max-width: none;
+  }
+  .instagramFeed .postMedia,
+  .instagramFeed .postCoverView,
+  .instagramFeed .reelCard .postMedia {
+    width: 100% !important;
+    max-width: none !important;
+    max-height: 280px;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+  .instagramFeed .postMedia img,
+  .instagramFeed .postMedia video,
+  .instagramFeed .postCoverView img,
+  .instagramFeed .reelCard .postMedia video {
+    max-height: 280px !important;
+  }
+}
+
+/* V20.6.4 — focused global search + clean feed tabs */
+.homeFeedTabs {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+.homeFeedTabs .feedTab span {
+  display: none !important;
+}
+.searchResultsPage {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding-bottom: 50px;
+}
+.searchPageHead {
+  padding-bottom: 18px;
+}
+.searchTabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0 28px;
+  border: 1px solid #1b3048;
+  border-radius: 12px;
+  padding: 5px;
+  background: #07111d;
+  position: sticky;
+  top: 66px;
+  z-index: 8;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+}
+.searchTab {
+  border: 0;
+  background: transparent;
+  color: #8296ad;
+  padding: 12px 14px;
+  border-radius: 9px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: 0.18s ease;
+}
+.searchTab:hover {
+  background: #0c1a2a;
+  color: #eaf3ff;
+}
+.searchTab.active {
+  background: linear-gradient(180deg, #1769ff, #0e5be4);
+  color: #fff;
+  box-shadow: 0 7px 20px rgba(23, 105, 255, 0.2);
+}
+.searchResultList {
+  padding: 22px 28px 0;
+}
+.searchPostResults {
+  max-width: 760px;
+  margin: 0 auto;
+}
+.searchPostResults .postCard {
+  margin-bottom: 14px;
+}
+.searchUserCard {
+  min-height: 260px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.searchUserCard .secondary {
+  margin-top: auto;
+}
+@media (max-width: 700px) {
+  .searchTabs {
+    margin: 0 12px;
+    top: 60px;
+  }
+  .searchResultList {
+    padding: 18px 12px 0;
+  }
+  .searchPageHead {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .homeFeedTabs {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    overflow-x: visible;
+  }
+  .feedTab {
+    font-size: 12px !important;
+  }
+}
+
+/* =========================================================
+   V20.6.5 — INSTANT INTERACTIONS + FIXED 16:9 CONTENT FRAME
+   Likes/comments/replies update locally without page navigation.
+   Posts, blogs and reels keep one stable viewing ratio.
+   ========================================================= */
+.instagramFeed .postCard,
+.searchPostResults .postCard {
+  contain: layout paint;
+}
+.instagramFeed .postMedia,
+.instagramFeed .postCoverView,
+.instagramFeed .blogViewer,
+.instagramFeed .blogViewport,
+.searchPostResults .postMedia,
+.searchPostResults .postCoverView,
+.searchPostResults .blogViewer,
+.searchPostResults .blogViewport {
+  width: 100%;
+}
+
+/* One predictable viewing frame for every content type. */
+.instagramFeed .postMedia,
+.instagramFeed .postCoverView,
+.instagramFeed .blogViewport,
+.searchPostResults .postMedia,
+.searchPostResults .postCoverView,
+.searchPostResults .blogViewport {
+  aspect-ratio: 16/9;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #030812;
+}
+.instagramFeed .postMedia img,
+.instagramFeed .postMedia video,
+.instagramFeed .postCoverView img,
+.searchPostResults .postMedia img,
+.searchPostResults .postMedia video,
+.searchPostResults .postCoverView img {
+  width: 100% !important;
+  height: 100% !important;
+  max-height: none !important;
+  aspect-ratio: auto !important;
+  object-fit: cover !important;
+}
+.instagramFeed .blogViewer,
+.searchPostResults .blogViewer {
+  margin-top: 14px;
+}
+.instagramFeed .blogViewport,
+.searchPostResults .blogViewport {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #203550;
+}
+.instagramFeed .blogViewport .blogCoverView,
+.searchPostResults .blogViewport .blogCoverView {
+  margin: 0;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+}
+.instagramFeed .blogViewport .blogCoverView img,
+.searchPostResults .blogViewport .blogCoverView img {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  object-fit: cover;
+}
+.instagramFeed .blogViewport .blogPages,
+.searchPostResults .blogViewport .blogPages {
+  height: 100%;
+  margin: 0;
+}
+.instagramFeed .blogViewport .blogPage,
+.searchPostResults .blogViewport .blogPage {
+  height: 100%;
+  overflow: auto;
+  padding: 18px !important;
+  scrollbar-width: thin;
+}
+.instagramFeed .blogViewport .blogPageFrame,
+.searchPostResults .blogViewport .blogPageFrame {
+  min-height: 100%;
+}
+.instagramFeed .blogViewport .blogPage p,
+.searchPostResults .blogViewport .blogPage p {
+  margin: 8px 0 0;
+  padding: 0 0 16px;
+  white-space: pre-wrap;
+  line-height: 1.65;
+}
+.instagramFeed .blogViewport .blogImageStrip,
+.searchPostResults .blogViewport .blogImageStrip {
+  max-width: 100%;
+}
+.instagramFeed .blogViewport .blogImageStrip img,
+.searchPostResults .blogViewport .blogImageStrip img {
+  flex: 0 0 100%;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16/9;
+  object-fit: cover;
+}
+
+/* Never visually replace the page during a small interaction. */
+.likeButton[data-pending="1"],
+.commentLikeButton[data-pending="1"] {
+  opacity: 0.65;
+  pointer-events: none;
+}
+.likeButton,
+.commentLikeButton {
+  transition:
+    transform 0.12s ease,
+    color 0.12s ease,
+    opacity 0.12s ease;
+}
+.likeButton:not([data-pending="1"]):active,
+.commentLikeButton:not([data-pending="1"]):active {
+  transform: scale(0.94);
+}
+.newContentNotice {
+  position: sticky;
+  top: 8px;
+  z-index: 4;
+  margin: 0 0 10px;
+  padding: 9px 12px;
+  border: 1px solid #245fa8;
+  border-radius: 10px;
+  background: #0a1e36;
+  color: #9fcaff;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+}
+
+/* Comments: collapsed threads by default. */
+.commentsModalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.commentsModalHeader h2 {
+  margin: 0;
+}
+.modalClose {
+  width: 34px;
+  height: 34px;
+  border: 1px solid #27415f;
+  border-radius: 9px;
+  background: #0b1828;
+  color: #dce8f5;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+}
+.commentList {
+  display: grid;
+  gap: 12px;
+  max-height: 55vh;
+  overflow: auto;
+  padding-right: 3px;
+}
+.comment {
+  padding: 11px 12px;
+  border: 1px solid #1d3047;
+  border-radius: 11px;
+  background: #091523;
+}
+.comment.replyComment {
+  background: #07111d;
+}
+.commentAuthor {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+.commentAuthor span {
+  display: grid;
+  min-width: 0;
+}
+.commentAuthor small {
+  color: #71869e;
+}
+.comment > p {
+  margin: 9px 0;
+  color: #d3deeb;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.commentActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.commentActions button {
+  border: 0;
+  background: transparent;
+  color: #8fa5bc;
+  padding: 5px 7px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-weight: 700;
+}
+.commentActions button:hover {
+  background: #0e2035;
+  color: #fff;
+}
+.commentReplies {
+  margin-top: 9px;
+  padding-left: 10px;
+  border-left: 2px solid #1d3d62;
+  display: grid;
+  gap: 8px;
+}
+.commentReplies[hidden] {
+  display: none !important;
+}
+.replyActionButton {
+  justify-self: start;
+  border: 1px solid #25425f;
+  background: #0b1b2d;
+  color: #a9c9e9;
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-weight: 800;
+}
+.replyingTo {
+  margin: 7px 0;
+  padding: 7px 10px;
+  border-left: 2px solid #3f8cff;
+  color: #9fc4ed;
+  background: #091827;
+  border-radius: 6px;
+  font-size: 11px;
+}
+.replyingTo.hidden {
+  display: none !important;
+}
+
+@media (max-width: 700px) {
+  .instagramFeed .postMedia,
+  .instagramFeed .postCoverView,
+  .instagramFeed .blogViewport,
+  .searchPostResults .postMedia,
+  .searchPostResults .postCoverView,
+  .searchPostResults .blogViewport {
+    aspect-ratio: 16/9;
+  }
+  .instagramFeed .blogViewport .blogPage,
+  .searchPostResults .blogViewport .blogPage {
+    padding: 14px !important;
+  }
+  .commentList {
+    max-height: 50vh;
+  }
+}
+
+/* Profile content tabs: Posts / Blogs / Reels */
+.profileContentCard {
+  padding: 0;
+  overflow: hidden;
+}
+.profileContentTabs {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  border-bottom: 1px solid #1c2d43;
+  background: #091321;
+}
+.profileContentTab {
+  position: relative;
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: #8fa2b8;
+  padding: 14px 18px;
+  font-weight: 800;
+  cursor: pointer;
+  transition:
+    color 0.18s ease,
+    background 0.18s ease;
+}
+.profileContentTab:hover {
+  background: #0d1c2d;
+  color: #eaf2fb;
+}
+.profileContentTab.active {
+  color: #fff;
+  background: #0e1d30;
+}
+.profileContentTab.active::after {
+  content: "";
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 0;
+  height: 2px;
+  background: #2877ff;
+  border-radius: 2px;
+}
+.profileContentPanel {
+  padding: 18px;
+}
+.profileContentPanel > .emptyState {
+  margin: 0;
+}
+@media (max-width: 650px) {
+  .profileContentTab {
+    padding: 12px 10px;
+    font-size: 13px;
+  }
+  .profileContentTab.active::after {
+    left: 10px;
+    right: 10px;
+  }
+  .profileContentPanel {
+    padding: 12px;
+  }
+}
+
+/* v20.6.8 social graph polish: compact follow controls in Followers/Following dialogs */
+.personRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 0;
+  background: transparent;
+  border: 0;
+  border-radius: 12px;
+}
+.personRow:hover {
+  background: #0e1d30;
+}
+.personRowIdentity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+  padding: 4px 6px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 10px;
+}
+.personRowIdentity:hover {
+  background: #12243a;
+}
+.personRowIdentity > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.personRowIdentity b,
+.personRowIdentity small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.personFollowBtn {
+  flex: 0 0 auto;
+  min-width: 88px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+.notificationMoreWrap {
+  display: flex;
+  justify-content: center;
+  padding: 4px 30px 42px;
+}
+@media (max-width: 650px) {
+  .personFollowBtn {
+    min-width: 78px;
+    padding: 7px 9px;
+  }
+  .personRow {
+    gap: 8px;
+  }
+  .notificationMoreWrap {
+    padding-left: 16px;
+    padding-right: 16px;
   }
 }
